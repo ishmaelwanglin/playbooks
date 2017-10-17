@@ -1,0 +1,15 @@
+---
+- hosts: ctrl
+  gather_facts: no
+  vars: 
+     - controller: "{{groups['ctrl'][0]}}"
+  tasks:
+  - block:
+    - name: test groups
+      shell: ssh {{item}}  free -h|awk '/Mem/{sum=$4+$7}END{print sum}'
+      with_items: "{{groups['ctrl']}}"
+      register: res
+    - name: display res
+      debug: msg="{% for i in res.results %} {{ i.item }} _ {{ i.stdout }} ; {% endfor %}"
+    delegate_to: "{{groups['ctrl'][0]}}"
+    run_once: true

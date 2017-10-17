@@ -1,0 +1,13 @@
+[controller]
+*.*.*.*
+[compute]
+*.*.*.*
+[neutron]
+*.*.*.*
+[ceph_mon]
+*.*.*.*
+[ceph_osd]
+*.*.*.*
+[zabbix]
+*.*.*.*
+

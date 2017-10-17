@@ -1,0 +1,16 @@
+---
+- block:
+  - name: get mem_info
+    shell: free -htw
+    register: mem_info
+  - name: debug display mem_info 
+    debug: 
+         var: mem_info.stdout_lines[3]
+         verbosity: 0
+  - name: get cpu_w
+    shell:  uptime | cut -d"," -f4-6
+    register: cpu_w
+  - name: debug display cpu_info
+    debug:
+         var: cpu_w.stdout
+         verbosity: 0

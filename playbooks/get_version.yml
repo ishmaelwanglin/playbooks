@@ -1,0 +1,24 @@
+---
+- hosts: test
+  remote_user: root
+  gather_facts: no
+  tasks:
+  - name: create log file
+    file: path=/root/get_version.log state=touch
+    delegate_to: localhost
+  - set_fact: logfile="/root/get_version.log"
+  - set_fact: packages_list=" httpd libvirt ceph"
+  - name: get packages version with
+    shell: |
+          echo "Hostname : $(hostname)      IP : $(hostname -i)"
+          echo "===================================================="
+          for i in {{ packages_list }};do
+              rpm -qi $i | awk '/Name|Version|Release|Build Date/{print}'
+              echo "---------------------------------------------------"
+          done
+          echo "===================================================="
+    register: infos
+  - name: logging
+    shell: > 
+           echo "{{ infos.stdout }}" >> {{ logfile }}
+    delegate_to: localhost

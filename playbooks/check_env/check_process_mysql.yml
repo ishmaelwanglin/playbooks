@@ -1,0 +1,25 @@
+---
+- hosts: ctrl[0]
+  gather_facts: false
+  tasks:
+  - name: 获取mysql pid
+    shell: cat /var/run/mysql/mysqld.pid
+    register: res_pid
+  - name: 获取mysql 物理内存
+    shell: ps -o rss -p {{res_pid.stdout}} | awk /[[:digit:]]/'{print $1/1024}'
+    register: res_rss
+  - debug:
+          var: res_rss.stdout
+          verbosity: 1
+  - name: mysql 内存占用百分比
+    shell: ps -o pmem {{res_pid.stdout}} | sed -n 2p
+    register: res_pmem
+  - debug:
+          var: res_pmem.stdout
+          verbosity: 1
+  - name: mysql资源占用异常
+    fail: msg="mysql process using {{res_rss.stdout}} MB memory, {{res_pmem.stdout}} percentage of system memory."
+    when: "{{res_rss.stdout}}|int >= 10000 or {{res_pmem.stdout}}|int >=10"
+  - name: mysql资源占用正常
+    debug: msg="mysql process using {{res_rss.stdout}} MB memory, {{res_pmem.stdout}} percentage of system memory."
+    when: "{{res_rss.stdout}}|int < 10000 or {{res_pmem.stdout}}|int < 10"

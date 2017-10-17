@@ -1,0 +1,25 @@
+---
+- hosts: ctrl[0]
+  gather_facts: false
+  tasks:
+  - name:  gather_facts
+    shell: cat /etc/hosts  | awk '/node/{print $2}'
+    register: res_hosts
+  - debug:
+          var: res_hosts.stdout
+          verbosity: 1
+  - debug:
+          var: res_hosts.stdout_lines
+          verbosity: 1
+  - name: gather memory free value
+    shell: free -g | sed  -n 2p | awk '{sum=$4+$7}END{print sum}'
+    register: res_free
+  - debug:
+          var: res_free.stdout
+          verbosity: 1
+  - name: 当前系统内存占用正常
+    debug: msg="free memory and cached memory total left {{res_free.stdout}} GB..."
+    when: "{{res_free.stdout}}|int > 9"
+  - name: 当前系统内存占用异常
+    debug: msg="free memory and cached memory total left {{res_free.stdout}} GB..."
+    when: "{{res_free.stdout}}|int < 9"

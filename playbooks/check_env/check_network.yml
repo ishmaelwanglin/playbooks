@@ -1,0 +1,6 @@
+---
+- name: check_network
+  hosts: ctrl
+  gather_facts: false
+  tasks:
+  - ping:

@@ -1,0 +1,13 @@
+---
+- name: change mem allocation ratio
+  lineinfile:
+     path: /etc/nova/nova.conf
+     regexp: '^ram_allocation_ratio ='
+     line: 'ram_allocation_ratio = {{mem_ratio}}'
+  tags: change_mem_ratio
+- name: change cpu allocation ratio
+  lineinfile:
+     path: /etc/nova/nova.conf
+     regexp: "^cpu_allocation_ratio ="
+     line: "cpu_allocation_ratio = {{cpu_ratio}}" 
+  tags: change_cpu_ratio
