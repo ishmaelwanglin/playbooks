@@ -1,0 +1,5 @@
+# pycharm project dir
+.idea/
+# eclipse project dir
+.project
+.pydevproject
