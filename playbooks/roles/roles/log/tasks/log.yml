@@ -1,0 +1,12 @@
+---
+- block:
+  - name: create logfile
+    file: 
+        path: "{{ logfile }}"
+        state: touch
+    register: info
+  - name: debug info
+    debug:
+        var: info
+        verbosity: 2
+  delegate_to: localhost

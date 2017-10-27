@@ -1,0 +1,9 @@
+---
+- name: free of memory
+  shell: >
+      free |awk '{if(NR==2){sum=$4+$7}}END{printf "%3.2f\n",sum/1024/1024}'
+  register: mem_res
+- name: debug mem_res
+  debug:
+      var: mem_res.stdout
+      verbosity: 2

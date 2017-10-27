@@ -1,0 +1,8 @@
+---
+- block:
+  - include: ceph_cluster.yml
+  - include: mon_map.yml
+  - include: osd_map.yml
+  run_once: true
+- include: mon_process.yml
+...

@@ -1,0 +1,15 @@
+---
+- hosts: test
+  remote_user: root
+  any_errors_fatal: true
+  gather_facts: true
+  pre_tasks: 
+  - shell: date +"%F"
+    register: date
+    delegate_to: localhost
+  - set_fact: time={{ date.stdout }}
+  roles:
+       - common
+       - log
+       - memory
+...

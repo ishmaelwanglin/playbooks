@@ -1,0 +1,24 @@
+---
+- name: shell get process num
+  shell: >
+      ps -ef |grep ceph-mon|grep -v grep|wc -l
+  register: monprocess_count
+- block:
+  - name: get mon process status
+    shell: >
+        ceph daemon mon.{{ ansible_hostname }} version
+    register: cephdaemon_res
+  - debug: msg="ceph daemon process is successful."
+    when: cephdaemon_res.stdout.find("version") != -1
+  - debug: msg="ceph daemon process is failed!"
+    when: cephdaemon_res.stdout.find("version") == -1
+  when: "{{ monprocess_count.stdout|int }} == 1"
+- block:
+  - name: mon down
+    debug: msg="{{ ansible_nodename }} mon process is down, ip is {{ inventory_hostname }}."
+  - name: start mon service on {{ inventory_hostname }}
+    systemd:
+        name: ceph-mon@{{ansible_hostname }}
+        state: started
+    delegate_to: "{{ inventory_hostname }}"
+  when: "{{ monprocess_count.stdout|int }} != 1"

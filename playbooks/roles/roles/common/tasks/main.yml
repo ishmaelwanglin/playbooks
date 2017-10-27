@@ -1,0 +1,4 @@
+---
+- become: true
+  include: hostname.yml
+...
