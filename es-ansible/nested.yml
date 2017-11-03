@@ -1,0 +1,9 @@
+---
+- hosts: localhost
+  gather_facts: false
+  remote_user: root
+  tasks:
+  - debug: msg="{{ item[0] }} is host, {{ item[1] }} is device."
+    with_nested:
+          - "{{ groups.osd_l }}"
+          - [ vdb, vdc, vdd ]

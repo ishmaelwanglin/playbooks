@@ -1,0 +1,11 @@
+---
+- hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: lineinfile
+    lineinfile: 
+        dest: /tmp/ssh_config
+        regexp: '^# *StrictHostKeyChecking *ask'
+        line: 'StrictHostKeyChecking no'
+        state: present
+        backrefs: yes

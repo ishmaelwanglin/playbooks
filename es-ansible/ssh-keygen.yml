@@ -1,0 +1,15 @@
+---
+- hosts: test[0]
+  gather_facts: false
+  remote_user: root
+  tasks:
+  - name: create ssh key
+    shell: |
+        ssh-keygen -t rsa -C "ansible_playbook" -f ~/.ssh/id_rsa -N ""
+    args:
+        creates: ~/.ssh/id_rsa
+  - name: create ssh key pub to authorized_keys
+    shell: cp id_rsa.pub authorized_keys
+    args:
+        chdir: ~/.ssh
+        creates: authorized_keys

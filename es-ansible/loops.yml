@@ -1,0 +1,9 @@
+---
+- hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: display info
+    debug: msg="{{ item[0] }} is 0 , {{ item[1] }}."
+    with_nested:
+         - ['one', 'two', 'three']
+         - ['2a', '2b', '2c']
