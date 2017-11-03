@@ -1,0 +1,142 @@
+---
+- name: 部署ceph的剧本
+  hosts: ceph_l
+  gather_facts: false
+  remote_user: root
+  vars: 
+        nodes: 'ceph_l1 ceph_l2 ceph_l3'
+  tasks:
+  - block:
+    - name: 创建ssh key
+      shell: >
+          ssh-keygen -t rsa -C "ansible_playbook" -f ~/.ssh/id_rsa -N ""
+      args:
+          creates: ~/.ssh/id_rsa
+    - name: 创建本地环境的authorized_keys
+      shell: >
+          cp id_rsa.pub authorized_keys 
+      args:
+          chdir: ~/.ssh
+          creates: authorized_keys
+    delegate_to: localhost
+    run_once: true
+  - name: 把ssh key复制到各个服务器上
+    copy:
+        src: ~/.ssh/{{ item }}
+        dest: ~/.ssh
+        force: yes
+    with_items: [id_rsa,authorized_keys]
+  - name: 删除远端服务器上的id_rsa.pub,防止不能实现互访
+    shell: rm -f id_rsa.pub
+    args: 
+        chdir: ~/.ssh
+        removes: id_rsa.pub
+  - name: 安装wget
+    yum:
+        name: wget
+        state: present
+  - name: 下载阿里云的repo源文件
+    get_url: 
+        url: "{{ item.url }}"
+        dest: /etc/yum.repos.d/{{ item.name }}
+    with_items:
+        - { name: 'epel.repo', url: 'http://mirrors.aliyun.com/repo/epel-7.repo' }
+        - { name: 'CentOS-Base.repo', url: 'http://mirrors.aliyun.com/repo/Centos-7.repo' }
+  - name: 远端服务器端需要安装libselinux-python，来实现copy模块的功能
+    yum: 
+        name: libselinux-python 
+        state: present 
+        update_cache: yes
+  - name: 将本地的ceph源文件复制到远端服务器
+    copy: 
+        src: files/ceph.repo
+        dest: /etc/yum.repos.d/ceph.repo
+  - name: 将本地编辑好的hosts文件复制到远端服务器
+    copy:
+        src: files/hosts
+        dest: /etc/hosts
+        force: yes
+  - block: 
+    - name: 给OSD节点的OSD盘作分区
+      parted: 
+          device: "{{ item }}"
+          label: gpt
+          number: 1
+          state: present
+          part_start: 2048s
+          part_end: 100%
+          part_type: primary
+      with_items: [/dev/vdb,/dev/vdc,/dev/vdd]
+    when: inventory_hostname in groups.osd_l
+  - block: 
+    - name: 三个mon节点都作为部署节点并安装ceph-deploy
+      yum: 
+          name: ceph-deploy
+          state: latest
+    - name: 给部署节点创建ceph-deploy的文件夹
+      file: 
+          path: /root/ceph-deploy
+          state: directory
+    - name: 修改远端服务器的ssh配置，StrictHostKeyChecking
+      lineinfile:
+          dest: /etc/ssh/ssh_config
+          regexp: '^# *StrictHostKeyChecking *ask'
+          line: StrictHostKeyChecking no
+          state: present
+          backrefs: yes
+      notify: restart sshd
+    - name: 重启远端服务器的sshd服务，使配置生效
+      meta: flush_handlers
+    when: inventory_hostname in groups.mon_l  
+  - name: 给全部节点安装ceph
+    yum:
+        name: ceph
+        state: present
+  - block: 
+    - name: 创建ceph集群
+      shell: ceph-deploy new {{ nodes }}
+      args:
+          chdir: /root/ceph-deploy
+          creates: ceph.conf
+      register: ceph_new
+    - name: 初始化mon
+      shell: ceph-deploy --overwrite-conf mon create-initial 
+      args:
+          chdir: /root/ceph-deploy
+      when: ceph_new.changed != false
+    - name: 判断配置文件是否变更，是否需要推送新的配置文件
+      shell: diff -q ceph.conf /etc/ceph/ceph.conf
+      args:
+          chdir: /root/ceph-deploy
+      ignore_errors: true
+      register: ceph_conf_changed
+    - name: 推送配置文件和keyring
+      shell: /usr/bin/ceph-deploy --overwrite-conf admin {{ nodes }}
+      args:
+          chdir: /root/ceph-deploy
+      when: ceph_conf_changed.rc == 1
+    - name: 部署 prepare OSD
+      shell: 'ceph-deploy --overwrite-conf osd prepare {{ item[0] }}:/dev/{{ item[1] }}'
+      args:
+          chdir: /root/ceph-deploy
+      with_nested:
+          - "{{ groups.osd_l }}"
+          - [ 'vdb1', 'vdc1', 'vdd1' ]
+    - name: 部署 activate OSD
+      shell: 'ceph-deploy --overwrite-conf osd activate {{ item[0] }}:/dev/{{ item[1] }}'
+      args:
+          chdir: /root/ceph-deploy
+      with_nested:
+          - "{{ groups.osd_l }}"
+          - [ 'vdb1', 'vdc1', 'vdd1' ]
+    delegate_to: "{{ groups.mon_l[0] }}"
+    run_once: true
+  - name: 为keyring增加可读权限
+    file: 
+        path: /etc/ceph/ceph.client.admin.keyring  
+        mode: u+r
+  handlers:
+  - name: restart sshd
+    systemd: 
+        state: restarted
+        name: sshd

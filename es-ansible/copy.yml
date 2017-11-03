@@ -1,0 +1,10 @@
+---
+- hosts: ceph_l
+  remote_user: root
+  gather_facts: false
+  tasks:
+  - name: copy to remote hosts
+    copy: 
+       src: /etc/sysconfig/network-scripts/ifcfg-eth0
+       dest: ./ifconfig
+       remote_src: yes
