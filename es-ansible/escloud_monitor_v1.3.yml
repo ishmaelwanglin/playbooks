@@ -58,11 +58,12 @@
       register: free_info
     - set_fact: free_ratio={{ free_info.stdout }}
     - name: < mem ratio logging >
-      shell: echo "[WARN] on {{ nodename }} avail memory ratio less than 10%." >> {{ logfile }}
+      shell: echo "[WARN] on {{ nodename }} available memory ratio less than 10%." >> {{ logfile }}
       delegate_to: localhost
       when: free_ratio|int <= 10
     - name: < Memory ratio is OK. >
-      shell: echo "[INFO] on {{ nodename }} avail memory ratio is {{ free_ratio }} ." >> {{ logfile }}
+      shell: echo "[INFO] on {{ nodename }} available memory ratio is {{ free_ratio }} ." >> {{ logfile }}
+      delegate_to: localhost
       when: free_ratio|int >= 10
 
 # 检查网络情况
@@ -107,7 +108,8 @@
              var: bin_size
              verbosity: 1
       - name: < display bin log's size >
-        debug: msg="[INFO] Check binary logs size in  MySQL database"
+        shell: echo "[INFO] Check binary logs size in  MySQL database" >> {{ logfile }}
+        delegate_to: localhost
         when: bin_size|int >= 100000000
       - name: < bin logging >
         shell: echo "[WARN] on {{ inventory_hostname }} Check binary logs size in  MySQL database" >> {{ logfile }}
@@ -193,11 +195,11 @@
       shell: |
              for i in $(seq {{ controllers }});do
                  test node-$i == $(echo {{ res_online_count.stdout }} | awk -v n=$i '{print $n}')  || \
-                 echo "[WARN] pacemaker service is offline on node-$i." >> {{ logfile }}
+                 echo "[WARN] on node-$i , pacemaker service is offline." >> {{ logfile }}
              done
       delegate_to: localhost
       when: res_online_count.stdout|int < res_ctrl_count.stdout|int
-    - shell: echo "[INFO] CRM服务在线节点服务正常" >> {{ logfile }}
+    - shell: echo "[INFO] on {{ nodename }} , CRM服务在线节点服务正常" >> {{ logfile }}
       delegate_to: localhost
       when: res_online_count.stdout|int == res_ctrl_count.stdout|int
     when: inventory_hostname in groups.controller
@@ -209,13 +211,16 @@
              egrep -o "rabbit.*[[:digit:]]" | awk 'BEGIN{FS=","}{print NF}'
       register: running_node
     - name: < Display rabbitmq-server running nodes >
-      debug: msg="[INFO] Current running rabbimq-server is {{ running_node.stdout }}"
+      shell: |
+            echo "[INFO]  Current running rabbimq-server is {{ running_node.stdout }}" >> {{ logfile }}
+      delegate_to: localhost
+      when: running_node.stdout|int == {{ controllers }}
     - name: < RabbitMQ cluster is WARN! >
-      shell: echo "[WARN] RabbitMQ cluster is not OK!" >> {{ logfile }}
+      shell: echo "[WARN]  RabbitMQ cluster is not OK!" >> {{ logfile }}
       delegate_to: localhost
       when: running_node.stdout|int != {{ controllers }}
     - name: < RabbitMQ cluster is OK. >
-      shell: echo "[INFO] RabbitMQ cluster is OK!" >> {{ logfile }}
+      shell: echo "[INFO]  RabbitMQ cluster is OK!" >> {{ logfile }}
       delegate_to: localhost
       when: running_node.stdout|int == {{ controllers }}
     when: inventory_hostname in groups.controller
