@@ -367,7 +367,6 @@
       shell: echo "[ERR] on {{ nodename }} {{ fs_err.stdout }} file system is error." >> {{ logfile }}
       when: "{{ fs_err.rc }} == 0"
     delegate_to: localhost
-    run_once: true
   - block:
     - name: logging over
       shell: >
