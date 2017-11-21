@@ -24,6 +24,10 @@
       shell: date +"%F"
       register: date
     - set_fact: logfile="/var/log/escloud_check/esck_{{ date.stdout }}.log"
+    - name: 创建日志目录
+      file: 
+          path: /var/log/escloud_check
+          state: directory
     - name: 创建日志文件
       file:
           path: "{{ logfile }}" 
@@ -102,34 +106,34 @@
       when: db_info.state == "started"
     when: inventory_hostname in groups.controller
 #二进制日志，这段有些问题。需要研究
-    - block:
-      - name: < check bin log's size >
-        shell: mysql -uroot -e "SHOW BINARY LOGS;" |tail -1|awk '{print $2}'
-        register: bin_info
-      - set_fact: bin_size={{ bin_info.stdout }}
-      - debug: 
-             var: bin_size
-             verbosity: 1
-      - name: < display bin log's size >
-        shell: echo "[INFO] Check binary logs size in  MySQL database" >> {{ logfile }}
-        delegate_to: localhost
-        when: bin_size|int >= 100000000
-      - name: < bin logging >
-        shell: echo "[WARN] on {{ inventory_hostname }} Check binary logs size in  MySQL database" >> {{ logfile }}
-        delegate_to: localhost
-        when: bin_size|int < 100000000
+  - block:
+    - name: < check bin log's size >
+      shell: mysql -uroot -e "SHOW BINARY LOGS;" |tail -1|awk '{print $2}'
+      register: bin_info
+    - set_fact: bin_size={{ bin_info.stdout }}
+    - debug: 
+           var: bin_size
+           verbosity: 1
+    - name: < display bin log's size >
+      shell: echo "[INFO] Check binary logs size in  MySQL database" >> {{ logfile }}
+      delegate_to: localhost
+      when: bin_size|int >= 100000000
+    - name: < bin logging >
+      shell: echo "[WARN] on {{ inventory_hostname }} Check binary logs size in  MySQL database" >> {{ logfile }}
+      delegate_to: localhost
+      when: bin_size|int < 100000000
     when: inventory_hostname in groups.controller
 # check_ceph_cluster
   - block:
     - name: < Ceph cluster status >
-      shell: ceph health detail
+      shell: ceph health
       register: ceph_health_info
     - name: < HEALTH OK !>
-      shell: echo "[INFO] on {{ nodename }} < HEALTH is OK !>" >> {{ logfile }}
+      shell: echo -e "[INFO] on {{ nodename }} < HEALTH is OK !>" >> {{ logfile }}
       when: ceph_health_info.stdout|search("OK")
       delegate_to: localhost
     - name: < HEALTH WARN !>
-      shell: echo "[WARN] on {{ nodename }} {{ ceph_health_info.stdout }}" >> {{ logfile }}
+      shell: echo -e "[WARN] on {{ nodename }} {{ ceph_health_info.stdout }}" >> {{ logfile }}
       when: not ceph_health_info.stdout|search("OK")
       delegate_to: localhost
     when: inventory_hostname in groups.ceph_mon
@@ -254,6 +258,7 @@
       shell: |
              echo "[INFO] mongod process using {{ mongod_rss.stdout }} MB memory,  \
                   {{ mongod_pmem.stdout }} percentage of system memory." >> {{ logfile }}
+      delegate_to: localhost
       when: mongod_rss.stdout|int < 10000 and mongod_pmem.stdout|int < 20
     when: inventory_hostname in groups.controller
 # 检查mysql的内存占用比,OK!
@@ -282,6 +287,7 @@
     - name: < mysql资源占用正常 >
       shell: echo "[INFO] mysql process using {{ mysql_rss.stdout }} MB memory, \
                   {{ mysql_pmem.stdout }} percentage of system memory." >> {{ logfile }}
+      delegate_to: localhost
       when: mysql_rss.stdout|int < 10000 or mysql_pmem.stdout|int < 10
     when: inventory_hostname in groups.controller
 # check_os_root_ratio
@@ -321,9 +327,10 @@
     - set_fact: nova_ratio={{ nova_info.stdout }} 
     - name: < nova_disk_ratio logging >
       shell: echo "[WARN] on {{ nodename }} nova partition ratio is greater than 80%, please expend disk" >> {{ logfile }}
-
+      delegate_to: localhost
     - name: < nova_disk_ratio is OK >
       shell:  echo "[INFO] on {{ nodename }} nova partition is ok." >> {{ logfile }}
+      delegate_to: localhost
       when: nova_ratio|int < 80
     when: inventory_hostname in groups.compute
 # check_osd_ratio
@@ -353,23 +360,52 @@
   - name: 检测磁盘故障
     shell: dmesg kern |grep "Medium Error" |egrep -o "sd[a-z]" | sort -u
     register: disk_err
-    changed_when: "{{ disk_err.rc }} == 0 "
+    changed_when: "{{ disk_err.stdout_lines|length }} != 0 "
+  - name: display disk error
+    debug:
+         var: "{{ disk_err.stdout_lines|length }}"
+         verbosity: 1
   - name: 检测磁盘文件系统故障
     shell: dmesg kern |grep "xfs_log_force" |egrep -o "sd[a-z][0-9]" |sort -u
     register: fs_err
-    changed_when: "{{ fs_err.rc }} == 0"
+    changed_when: "{{ fs_err.stdout_lines|length }} != 0"
+  - name: display disk fs error
+    debug:
+         var: "{{ fs_err.stdout_lines|length }}"
+         verbosity: 1
 # 记录磁盘故障和文件系统故障的日志
   - block:
     - name: logging disk  error
       shell: echo "[ERR] on {{ nodename }} {{ disk_err.stdout }} medium error." >> {{ logfile }}
-      when: "{{ disk_err.rc }} == 0"
+      when: "{{ disk_err.stdout_lines|length }} != 0"
     - name: logging fs error
       shell: echo "[ERR] on {{ nodename }} {{ fs_err.stdout }} file system is error." >> {{ logfile }}
-      when: "{{ fs_err.rc }} == 0"
+      when: "{{ fs_err.stdout_lines|length }} != 0"
     delegate_to: localhost
+# 11-21 增加检测memcached服务的内存使用情况
+  - block:
+    - name: 检查memcached的内存占用情况
+      shell: ps -o "pcpu,pmem,rss" -C memcached |sed -n '$p' 
+      register: memcached_res
+    - set_fact: 
+          memcached_pcpu: "{{ memcached_res.stdout.split()[0] }}"
+          memcached_pmem: "{{ memcached_res.stdout.split()[1] }}"
+          memcached_rss: "{{ memcached_res.stdout.split()[2] }}"
+    when: inventory_hostname in groups.controller
+  - block:
+    - name: 将memcached的内存信息写入日志<10%
+      shell: echo "[INFO] on {{ nodename }} memcached used memory {{ memcached_pmem }} , ratio is ok." >> {{ logfile }} 
+      when: memcached_pmem|int < 10
+    - name: 将memcached的内存信息写入日志>10%
+      shell: echo "[WARN] on {{ nodename }} memcached used memory {{ memcached_pmem }} , ratio is grater than 10%!" >> {{ logfile }}
+      when: memcached_pmem|int >= 10
+    when: inventory_hostname in groups.controller
+    delegate_to: localhost 
+#日志巡检结束
   - block:
     - name: logging over
       shell: >
              echo -e "[OVER] ==================== check escloud is over. ====================\n" >> {{ logfile }}
     delegate_to: localhost
     run_once: true
+...

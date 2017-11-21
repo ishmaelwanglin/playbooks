@@ -431,7 +431,26 @@
       when: xml_info.status != 200
       delegate_to: localhost
     when: inventory_hostname in groups.controller
-   
+# 11-21 增加检测memcached服务的内存使用情况
+  - block:
+    - name: 检查memcached的内存占用情况
+      shell: ps -o "pcpu,pmem,rss" -C memcached |sed -n '$p'
+      register: memcached_res
+    - set_fact:
+          memcached_pcpu: "{{ memcached_res.stdout.split()[0] }}"
+          memcached_pmem: "{{ memcached_res.stdout.split()[1] }}"
+          memcached_rss: "{{ memcached_res.stdout.split()[2] }}"
+    when: inventory_hostname in groups.controller
+  - block:
+    - name: 将memcached的内存信息写入日志<10%
+      shell: echo "[INFO] on {{ nodename }} memcached used memory {{ memcached_pmem }} , ratio is ok." >> {{ logfile }}
+      when: memcached_pmem|int < 10
+    - name: 将memcached的内存信息写入日志>10%
+      shell: echo "[WARN] on {{ nodename }} memcached used memory {{ memcached_pmem }} , ratio is grater than 10%!" >> {{ logfile }}
+      when: memcached_pmem|int >= 10
+    when: inventory_hostname in groups.controller
+    delegate_to: localhost
+
 # 日志巡检结束
   - block:
     - name: logging over
@@ -439,3 +458,4 @@
              echo -e "[OVER] ==================== check escloud is over. ====================\n" >> {{ logfile }}
     delegate_to: localhost
     run_once: true
+...
