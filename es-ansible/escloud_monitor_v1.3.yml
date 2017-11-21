@@ -231,65 +231,49 @@
       delegate_to: localhost
       when: running_node.stdout|int == {{ controllers }}
     when: inventory_hostname in groups.controller
-# check mongo process
+# check mongo process, 11-21 update
   - block:
-    - name: < mongod  pid >
-      shell: cat /var/run/mongodb/mongod.pid
-      register: mongod_pid
-    - name: < mongod  物理内存 >
-      shell: ps -o rss -p {{ mongod_pid.stdout }} | awk /[[:digit:]]/'{print $1/1024}'
-      register: mongod_rss
-    - debug:
-            var: mongod_rss.stdout
-            verbosity: 1
-    - name: < mongod  memory used ratio >
-      shell: ps -o pmem {{ mongod_pid }} | sed -n 2p
-      register: mongod_pmem
-    - debug:
-            var: mongod_pmem.stdout
-            verbosity: 1
+    - name: < get mongod used memory status >
+      shell: ps -C mongod -o "pmem,rss"|sed -n '$p'
+      register: mongod_mem
+    - set_fact: 
+          mongod_pmem: "{{ mongod_mem.stdout.split()[0] }}"
+          mongod_rss: "{{ mongod_mem.stdout.split()[1] }}"
+    when: inventory_hostname in groups.controller
+  - block:
     - name: < mongo内存占用异常 >
       shell: |
-             echo "[WARN] on {{ nodename }} Mongod process using {{ mongod_rss.stdout }} MB memory, \
-             {{ mongod_pmem.stdout }} percentage of system memory." >> {{ logfile }}
-      delegate_to: localhost
-      when: mongod_rss.stdout|int >= 10000 or mongod_pmem.stdout|int >=20
+             echo "[WARN] on {{ nodename }} Mongod process using {{ mongod_rss|int /1024/1024 }} MB memory,
+             {{ mongod_pmem }} percentage of system memory." >> {{ logfile }}
+      when: mongod_rss|int >= 1000000 or mongod_pmem|int >=20
     - name: < mongo内存占用正常 >
       shell: |
-             echo "[INFO] mongod process using {{ mongod_rss.stdout }} MB memory,  \
-                  {{ mongod_pmem.stdout }} percentage of system memory." >> {{ logfile }}
-      delegate_to: localhost
-      when: mongod_rss.stdout|int < 10000 and mongod_pmem.stdout|int < 20
+             echo "[INFO] mongod process using {{ mongod_rss|int /1024/1024 }} MB memory,  \
+                  {{ mongod_pmem }} percentage of system memory." >> {{ logfile }}
+      when: mongod_rss|int < 1000000 and mongod_pmem|int < 20
     when: inventory_hostname in groups.controller
-# 检查mysql的内存占用比,OK!
+    delegate_to: localhost
+# 检查mysql的内存占用比,OK! 11-21 update
   - block:
-    - name: < 获取mysql pid >
-      shell: cat /var/run/mysql/mysqld.pid
-      register: mysql_pid
-    - name: < 获取mysql 物理内存 >
-      shell: ps -o rss -p {{ mysql_pid.stdout }} | awk /[[:digit:]]/'{printf "%.2f",$1/1024}'
-      register: mysql_rss
-    - debug:
-            var: mysql_rss.stdout
-            verbosity: 1
-    - name: < mysql 内存占用百分比 >
-      shell: ps -o pmem {{ mysql_pid.stdout }} | sed -n 2p
-      register: mysql_pmem
-    - debug:
-            var: mysql_pmem.stdout
-            verbosity: 1
+    - name: < get mysql memory used status >
+      shell: ps -C mysqld -o "pmem,rss"|sed -n '$p'
+      register: mysqld_mem
+    - set_fact: 
+          mysqld_pmem: "{{ mysqld_mem.stdout.split()[0] }}"
+          mysqld_rss: "{{ mysqld_mem.stdout.split()[1] }}"
+    when: inventory_hostname in groups.controller
+  - block:  
     - name: < mysql资源占用异常 >
       shell: |
-             echo "[WARN] on {{ nodename }} mysql process using {{ mysql_rss.stdout }} MB memory, \
-             {{ mysql_pmem.stdout }} percentage of system memory." >> {{ logfile }}
-      delegate_to: localhost
-      when: mysql_rss.stdout|int >= 10000 or mysql_pmem.stdout|int >=10
+             echo "[WARN] on {{ nodename }} mysqld using {{ mysqld_rss|int /1024/1024 }} MB memory,
+             {{ mysqld_pmem }} percentage of system memory." >> {{ logfile }}
+      when: mysqld_pmem|int >= 10 or mysqld_rss|int > 1000000
     - name: < mysql资源占用正常 >
-      shell: echo "[INFO] mysql process using {{ mysql_rss.stdout }} MB memory, \
-                  {{ mysql_pmem.stdout }} percentage of system memory." >> {{ logfile }}
-      delegate_to: localhost
-      when: mysql_rss.stdout|int < 10000 or mysql_pmem.stdout|int < 10
+      shell: echo "[INFO] mysqld using {{ mysqld_rss|int /1024/1024 }} MB memory,
+                  {{ mysqld_pmem }} percentage of system memory." >> {{ logfile }}
+      when: mysqld_rss|int < 1000000 or mysqld_pmem|int < 10
     when: inventory_hostname in groups.controller
+    delegate_to: localhost
 # check_os_root_ratio
   - block:
     - name: < get os-root ratio >
@@ -408,4 +392,3 @@
              echo -e "[OVER] ==================== check escloud is over. ====================\n" >> {{ logfile }}
     delegate_to: localhost
     run_once: true
-...
