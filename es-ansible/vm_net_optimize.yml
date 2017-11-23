@@ -12,12 +12,14 @@
           done
     ignore_errors: true
   - name: < 60-vm-tap.rules >
-    copy: 
-        dest: /etc/udev/rules.d/
-        src: files/60-vm-tap.rules
-        mode: 0644
-        backup: yes
-        force: yes
+    blockinfile:
+      dest: /etc/udev/rules.d/60-vm-tap.rules
+      create: yes
+      block: |
+           ACTION=="add", KERNEL=="tap?*", RUN+="/sbin/ip link set %k txqueuelen 2000"
+      insertafter: EOF
+      state: present
+      backup: yes
     notify: reload rules
   - name: < reload rules >
     meta: flush_handlers
