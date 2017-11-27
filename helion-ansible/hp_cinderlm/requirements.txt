@@ -1,5 +1,0 @@
-python-cinderclient
-python-swiftclient
-python-glanceclient
-python-novaclient
-pyyaml

@@ -1,6 +1,0 @@
-if [ -e /sys/firmware/efi ]
-then
-    wget -O ./partition_scheme http://$1/preseed/partition-uefi
-else
-    wget -O ./partition_scheme http://$1/preseed/partition-pxe
-fi

@@ -1,2 +1,0 @@
-neutron ALL=(root) NOPASSWD:ALL
-Defaults:neutron !requiretty

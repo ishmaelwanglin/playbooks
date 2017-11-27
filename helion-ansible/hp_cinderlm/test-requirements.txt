@@ -1,7 +1,0 @@
-hacking
-pygments
-nose
-nose-exclude
-coverage
-nosehtmloutput
-testtools
