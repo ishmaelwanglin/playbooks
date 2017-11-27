@@ -1,6 +1,0 @@
----
-- hosts: mon_l
-  gather_facts: false
-  tasks:
-  - debug:
-        var: groups.mon_l
