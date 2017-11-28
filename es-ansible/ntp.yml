@@ -1,42 +1,12 @@
 ---
 - hosts: all
-  gather_facts: no
+  gather_facts: false
   remote_user: root
   vars: 
       ntp_conf: /etc/ntp.conf
       hw_conf: /etc/sysconfig/ntpd
   tasks:
-  - block:
-    - name: hwclock sync config
-      blockinfile:
-          path: "{{ hw_conf }}"
-          block: |
-            SYNC_HWCLOCK=yes
-          state: present
-    - name: change restrict nomodify
-      lineinfile:
-          path: "{{ ntp_conf }}"
-          regexp: "restrict default.*"
-          line: "restrict default nomodify"
-          insertafter: "permit the source.*"
-          state: present
-          backup: yes
-    - name: remove server.*iburst  
-      lineinfile: 
-          path: "{{ ntp_conf }}"
-          regexp: "^server.*iburst"
-          state: absent
-      tags:  remove_servers
-    - name: add 127.127.1.0 fudge
-      blockinfile:
-          path: "{{ ntp_conf }}"
-          block: |
-            server 127.127.1.0 # local clock
-            fudge 127.127.1.0 stratum 8
-          state: present
-      notify: restart ntpd  
-    when: inventory_hostname == groups.controller[0]
-  - block:
+  - block: # common
     - name: hwclock sync config
       blockinfile:
           path: "{{ hw_conf }}"
@@ -48,6 +18,25 @@
           path: "{{ ntp_conf }}"
           regexp: "^server.*iburst"
           state: absent
+  - block: # on node-1
+    - name: change restrict nomodify
+      lineinfile:
+          path: "{{ ntp_conf }}"
+          regexp: "restrict default.*"
+          line: "restrict default nomodify"
+          insertafter: "permit the source.*"
+          state: present
+          backup: yes
+    - name: add 127.127.1.0 fudge 
+      blockinfile:
+          path: "{{ ntp_conf }}"
+          block: |
+            server 127.127.1.0 # local clock
+            fudge 127.127.1.0 stratum 8
+          state: present
+      notify: restart ntpd  
+    when: inventory_hostname == groups.controller[0]
+  - block: # not node-1
     - name: add server
       blockinfile:
           path: "{{ ntp_conf }}"
