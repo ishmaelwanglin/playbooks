@@ -1,3 +1,4 @@
+# useage: ansible-playbook basename -e "host=node-? cpu=? mem=?"
 - name: change < cpu|mem > ratio
   hosts: compute
   gather_facts: false
