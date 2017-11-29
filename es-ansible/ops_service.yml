@@ -1,23 +1,28 @@
 ---
-- name: Ops standard of service team from China.ES
+- name: < Ops standard of service team from China.ES v1.0 >
   hosts: all
   gather_facts: false
   remote_user: root
   vars:
       ntp_conf: /etc/ntp.conf
       hw_conf: /etc/sysconfig/ntpd
+      nova_conf: /etc/nova/nova.conf
+      reserved_memory: 8192
+      mini_free: 3145728
+      memcached_cache: '"8192"'
+      mongodb_cache: 2
   tasks:
   - block: #common, all nodes will execute
   # ntp config
     - name: hwclock sync config 
       blockinfile:
-          path: "{{ hw_conf }}"
+          dest: "{{ hw_conf }}"
           block: |
               SYNC_HWCLOCK=yes
           state: present
     - name: remove server.*iburst
       lineinfile:
-          path: "{{ ntp_conf }}"
+          dest: "{{ ntp_conf }}"
           regexp: "^server.*ibursh"
           state: absent
     # remove log files
@@ -55,12 +60,64 @@
   - block: # on node-1
     - name: change restrict nomodify
       blockinfile:
-          path: "{{ ntp_conf }}"
+          dest: "{{ ntp_conf }}"
           block: | 
               server {{ groups.controller[0] }}
           state: present
       notify: restart ntpd
     when: inventory_hostname != groups.controller[0]
+  - block: # change compute node reserved memory unit(MB)
+    - name: change reserved memory
+      ini_file: 
+          dest: "{{ nova_conf }}"
+          section: DEFAULT
+          option: reserved_host_memory_mb
+          value: "{{ reserved_memory }}"
+          state: present
+          backup: yes
+      notify: restart nova-compute
+    when: inventory_hostname in groups.compute
+  - block: # set mini_free,prevent oom
+    - name: set mini_free
+      sysctl: 
+          name: vm.min_free_kbytes
+          value: "{{ mini_free }}"
+          state: present
+          sysctl_set: yes
+    when: inventory_hostname in groups.compute  
+  - block: # memcached cache 
+    - name:  set memcache 
+      ini_file:
+          dest: /etc/sysconfig/memcached
+          section: null
+          option: CACHESIZE
+          value: "{{ memcached_cache }}"
+          backup: yes
+          no_extra_spaces: yes
+      notify: restart memcached
+    when: inventory_hostname in groups.controller
+  - block: # change mongodb cache 
+    - name: set mongodb used memory
+      replace:
+          dest: /etc/mongod.conf
+          regexp: 'cacheSizeGB.+'
+          replace: 'cacheSizeGB: {{ mongodb_cache }}'
+          backup: yes
+      notify: restart mongodb
+    when: inventory_hostname in groups.controller
+  - block: # ovetime dhcp
+    - name: overtime dhcp
+      ini_file:
+          dest: /etc/neutron/neutron.conf
+          section: DEFAULT
+          option: dhcp_lease_duration
+          value: 321408000
+          backup: yes 
+      notify: 
+          - kill dnsmasq process
+          - restart neutron-dhcp-agent
+    when: inventory_hostname in groups.controller
+          
   handlers:
   - name: restart ntpd
     systemd:
@@ -73,5 +130,23 @@
   - name: restart crond
     systemd:
         name: crond
+        state: restarted
+  - name: restart nova-compute
+    systemd:
+        name: openstack-nova-compute
+        state: restarted
+  - name: restart memcached
+    systemd: 
+        name: memcached
+        state: restarted
+  - name: restart mongodb
+    systemd:
+        name: mongodb
+        state: restarted
+  - name: kill dnsmasq process
+    shell: ps h -C dnsmasq -o pid|xargs -i kill -9 {}
+  - name: restart neutron-dhcp-agent
+    systemd:
+        name: neutron-dhcp-agent
         state: restarted
 ...
