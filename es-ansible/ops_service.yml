@@ -54,7 +54,7 @@
       changed_when: chk_mc_st.rc == 0 
   - block: # on node-1
     - name: change restrict nomodify
-      lineinfile:
+      blockinfile:
           path: "{{ ntp_conf }}"
           block: | 
               server {{ groups.controller[0] }}
