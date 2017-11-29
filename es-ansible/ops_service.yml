@@ -12,14 +12,14 @@
     - name: hwclock sync config 
       blockinfile:
           path: "{{ hw_conf }}"
-	  block: |
-	      SYNC_HWCLOCK=yes
-	  state: present
+          block: |
+              SYNC_HWCLOCK=yes
+          state: present
     - name: remove server.*iburst
       lineinfile:
           path: "{{ ntp_conf }}"
-	  regexp: "^server.*ibursh"
-	  state: absent
+          regexp: "^server.*ibursh"
+          state: absent
     # remove log files
     - name: move rsyslog
       shell: mv /etc/rsyslog.d/00-remote.conf /root
@@ -42,31 +42,36 @@
       register: mc_info
       ignore_errors: true
       changed_when: mc_st.stdout == "active" and mc_info.rc == 0
+    - name: check chkconfig mcollective status
+      shell: chkconfig --list mcollective 2> /dev/null |grep on
+      register: chk_mc_st
+      ignore_errors: true
+      changed_when: chk_mc_st.rc == 0
     - name: chkconfig mcollective off
       shell: chkconfig mcollective off
       register: mc_chk
       ignore_errors: true
-    #  changed_when: conditions wait
+      changed_when: chk_mc_st.rc == 0 
   - block: # on node-1
     - name: change restrict nomodify
       lineinfile:
           path: "{{ ntp_conf }}"
-	  block: | 
-	      server {{ groups.controller[0] }}
-	  state: present
+          block: | 
+              server {{ groups.controller[0] }}
+          state: present
       notify: restart ntpd
     when: inventory_hostname != groups.controller[0]
   handlers:
   - name: restart ntpd
     systemd:
          name: ntpd
-	 state: restarted
+         state: restarted
   - name: restart rsyslog
     systemd:
         name: rsyslog
-	state: restarted
+        state: restarted
   - name: restart crond
     systemd:
         name: crond
-	state: restarted
+        state: restarted
 ...
