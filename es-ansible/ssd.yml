@@ -1,9 +1,0 @@
----
-- name: ssd journal change noop
-  hosts: compute
-  gather_facts: false
-  tasks:
-  - name: set
-    shell: >
-        echo noop > /sys/block/sdq/queue/scheduler
-	echo "echo noop > /sys/block/sdq/queue/scheduler" >> /etc/rc.local
