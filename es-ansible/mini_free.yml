@@ -1,0 +1,13 @@
+---
+- name: set mini_free ,prevent oom
+  hosts: compute
+  gather_facts: false
+  remote_user: root
+  vars:
+      mini_free: 3145728
+  tasks:
+  - name: set value of mini_free
+    shell: |
+        echo {{ mini_free }} > /proc/sys/vm/min_free_kbytes
+	echo vm.min_free_kbytes = {{ mini_free }} >> /etc/sysctl.conf
+      
