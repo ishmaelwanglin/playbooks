@@ -28,15 +28,17 @@
     # remove log files
     - name: move rsyslog
       shell: mv /etc/rsyslog.d/00-remote.conf /root
-      ignore_errors: true
+      args:
+          removes: /etc/rsyslog.d/00-remote.conf
       register: rsyslog_res
-      changed_when: rsyslog_res.rc == 0
+      changed_when: rsyslog_res.stdout.find('skip') == -1
       notify: restart rsyslog
     - name: move nailgun-agent
       shell: mv /etc/cron.d/nailgun-agent /root
-      ignore_errors: true
+      args:
+          removes: /etc/cron.d/nailgun-agent
       register: nailgun_res
-      changed_when: nailgun_res.rc == 0
+      changed_when: nailgun_res.stdout.find('skip') == -1
       notify: restart crond
     - name: check mcollective status
       shell: /etc/init.d/mcollective status |awk '/Active/{print $2}'
@@ -45,18 +47,15 @@
     - name: mcollective stop
       shell: /etc/init.d/mcollective stop
       register: mc_info
-      ignore_errors: true
       changed_when: mc_st.stdout == "active" and mc_info.rc == 0
     - name: check chkconfig mcollective status
-      shell: chkconfig --list mcollective 2> /dev/null |grep on
+      shell: chkconfig --list mcollective 2> /dev/null |awk '{print $5}'
       register: chk_mc_st
-      ignore_errors: true
-      changed_when: chk_mc_st.rc == 0
+      changed_when: chk_mc_st.stdout.find('on') != -1
     - name: chkconfig mcollective off
       shell: chkconfig mcollective off
       register: mc_chk
-      ignore_errors: true
-      changed_when: chk_mc_st.rc == 0 
+      changed_when: chk_mc_st.stdout.find('on') != -1 
   - block: # on node-1
     - name: change restrict nomodify
       blockinfile:
@@ -85,6 +84,7 @@
           state: present
           sysctl_set: yes
     when: inventory_hostname in groups.compute  
+ # 由于不能自动判断硬盘是ssd还是sas，暂不添加自动设置硬盘调度算法
   - block: # memcached cache 
     - name:  set memcache 
       ini_file:
@@ -105,7 +105,7 @@
           backup: yes
       notify: restart mongodb
     when: inventory_hostname in groups.controller
-  - block: # ovetime dhcp
+  - block: # 延长 dhcp 租期
     - name: overtime dhcp
       ini_file:
           dest: /etc/neutron/neutron.conf
@@ -144,8 +144,7 @@
         name: mongodb
         state: restarted
   - name: kill dnsmasq process
-    shell: pkill dnsmasq 
-           #ps h -C dnsmasq -o pid|xargs -i kill -9 {}
+    shell: ps h -C dnsmasq -o pid|xargs -i kill -9 {}
   - name: restart neutron-dhcp-agent
     systemd:
         name: neutron-dhcp-agent
