@@ -144,7 +144,8 @@
         name: mongodb
         state: restarted
   - name: kill dnsmasq process
-    shell: ps h -C dnsmasq -o pid|xargs -i kill -9 {}
+    shell: pkill dnsmasq
+  #  shell: ps h -C dnsmasq -o pid|xargs -i kill -9 {}
   - name: restart neutron-dhcp-agent
     systemd:
         name: neutron-dhcp-agent
