@@ -23,7 +23,7 @@
     - name: remove server.*iburst
       lineinfile:
           dest: "{{ ntp_conf }}"
-          regexp: "^server.*ibursh"
+          regexp: "^server.*iburst"
           state: absent
     # remove log files
     - name: move rsyslog
