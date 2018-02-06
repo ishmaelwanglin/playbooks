@@ -1,0 +1,12 @@
+---
+- name: < mongodb mount point used ratio >
+  shell: df -h|awk '/mongo-mongodb/{print $5}'| egrep -o "[[:digit:]]{1,3}"
+  register: mongo_point_ratio
+- block:
+  - name: < mongodb disk used ratio log sucess >
+    shell: echo "[INFO] on {{ hostname }} mongo partition is success." >> {{ logfile }}
+    when: mongo_point_ratio.stdout|int < 80
+  - name: < mongodb disk used ratio log failed >
+    shell: echo "[WARN] on {{ hostname }} mongo partition ratio is grater than 80%, please expend disk" >> {{ logfile }}
+    when: mongo_point_ratio.stdout|int >= 80
+  delegate_to: localhost

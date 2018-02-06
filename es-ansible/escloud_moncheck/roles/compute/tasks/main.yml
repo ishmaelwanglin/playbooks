@@ -1,0 +1,5 @@
+---
+- block:
+  - import_tasks: service_status.yml
+  - import_tasks: vms_number.yml
+  when: inventory_hostname in groups.compute

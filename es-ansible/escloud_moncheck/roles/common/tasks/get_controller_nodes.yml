@@ -1,0 +1,6 @@
+---
+- name: < get controller node count numbers >
+  shell: cat /etc/haproxy/conf.d/020-keystone-1.cfg |grep server | awk '{print $2}'| wc -l
+  register: count_controller_out
+  when: inventory_hostname in groups.controller
+  delegate_to: "{{ groups.controller[0] }}"

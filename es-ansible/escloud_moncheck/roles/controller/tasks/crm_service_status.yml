@@ -1,0 +1,19 @@
+---
+- name: < crm manage service status >
+  shell: crm resource status {{ item }}
+  with_items:
+    - "{{ crm_services }}"
+  register: crm_services_status
+- block:
+  - name: < crm service success log >
+    shell: |-
+          echo "[INFO] on {{ hostname }} crm {{ item.item }} is running ." >> {{ logfile }}
+    when: "item.stderr|length == 0"
+    with_items:
+      - "{{ crm_services_status.results }}"
+  - name: < crm service failed log >
+    shell: echo "[WARN] on {{ hostname }} crm {{ item.item }} is stopped ." >> {{ logfile }}
+    when: "item.stderr|length != 0"
+    with_items:
+      - "{{ crm_services_status.results }}"
+  delegate_to: localhost

@@ -1,0 +1,13 @@
+---
+- name: inspection script for Easystack.Ops v 1.4 
+  remote_user: root
+  gather_facts: false
+  any_errors_fatal: false
+  hosts: all
+  roles:  
+  - log
+  - common
+  - net
+  - controller 
+  - ceph-mon 
+  - compute

@@ -1,0 +1,26 @@
+---
+- name: < check memcached process >
+  shell: ps -C memcached --no-headers| wc -l
+  register: memcached_process
+- block:
+  - name: < memcached memory used >
+    shell: ps -o "pcpu,pmem,rss" -C memcached --no-headers
+    register: memcached_mem_used
+  - set_fact:
+        memcached_pcpu: "{{ memcached_mem_used.stdout.split()[0] }}"
+        memcached_pmem: "{{ memcached_mem_used.stdout.split()[1] }}"
+        memcached_rss: "{{ memcached_mem_used.stdout.split()[2] }}"
+  when: memcached_process.stdout|int == 1
+- block:
+  - name: < memcached process success log >
+    shell: echo "[INFO] on {{ hostname }} memcached used memory {{ memcached_pmem }} , ratio is ok." >> {{ logfile }}
+    when: memcached_pmem|int < 10
+  - name: < memcached process failed log >
+    shell: echo "[WARN] on {{ hostname }} memcached used memory {{ memcached_pmem }} , ratio is grater than 10%!" >> {{ logfile }}
+    when: memcached_pmem|int >= 10
+  when: memcached_process.stdout|int == 1
+  delegate_to: localhost
+- name: < memcached process error >
+  shell: echo "[WARN] on {{ hostname }} memcached process had some errors." >> {{ logfile }}
+  when: memcached_process.stdout|int != 1
+  delegate_to: localhost

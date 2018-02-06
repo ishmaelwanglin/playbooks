@@ -1,0 +1,17 @@
+- name: < rabbitmq server running nodes >
+  shell: |-
+         rabbitmqctl cluster_status | grep "running_nodes" | \
+         egrep -o "rabbit.*[[:digit:]]" | awk 'BEGIN{FS=","}{print NF}'
+  register: running_node
+- block:
+  - name: < rabbitmq-server running nodes log >
+    shell: |-
+          echo "[INFO] On {{ hostname }} Current running rabbimq-server is {{ running_node.stdout }}" >> {{ logfile }}
+    when: running_node.stdout|int == ctrl_nodes_number_out.stdout|int
+  - name: < RabbitMQ cluster is WARN! >
+    shell: echo "[WARN]  RabbitMQ cluster is not OK!" >> {{ logfile }}
+    when: running_node.stdout|int != ctrl_nodes_number_out.stdout|int
+  - name: < RabbitMQ cluster is OK. >
+    shell: echo "[INFO]  RabbitMQ cluster is OK!" >> {{ logfile }}
+    when: running_node.stdout|int == ctrl_nodes_number_out.stdout|int
+  delegate_to: localhost

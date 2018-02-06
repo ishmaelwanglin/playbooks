@@ -1,0 +1,7 @@
+---
+- block: 
+  - import_tasks: create_log_file.yml
+  - import_tasks: initial_log_file.yml
+  delegate_to: localhost
+  run_once: true
+...

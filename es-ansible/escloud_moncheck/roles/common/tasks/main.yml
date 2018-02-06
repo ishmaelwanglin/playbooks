@@ -1,0 +1,11 @@
+---
+- include_tasks: get_host_name.yml
+- include_tasks: get_controller_nodes.yml
+- import_tasks: os_root.yml
+- import_tasks: uptime.yml
+- import_tasks: check_disk.yml
+- import_tasks: free.yml
+- import_tasks: ../../log/tasks/logging.yml
+- import_tasks: free_ratio.yml
+- import_tasks: ../../log/tasks/logging.yml
+...

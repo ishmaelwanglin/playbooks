@@ -1,0 +1,17 @@
+---
+- name: < get mysql server ip address >
+  shell: hostname -i
+  register: mysql_ip_out
+- name: < get mariadb port state >
+  wait_for:
+      port: 3307
+      delay: 1
+      timeout: 2
+      host: "{{ mysql_ip_out.stdout }}"
+  register: mysql_port_state_out
+- name: < compare value >
+  shell: test {{ mysql_port_state_out.state }} == "started"
+  ignore_errors: true
+  register: compare_out
+- set_fact: CHECK_ITEM="mariadb_port_state"
+- set_fact: WARN_VALUE="< is open >"

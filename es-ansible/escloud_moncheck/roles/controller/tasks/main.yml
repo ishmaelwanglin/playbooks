@@ -1,0 +1,16 @@
+---
+- block:
+  - import_tasks: get_public_vip.yml
+  - import_tasks: service_status.yml
+  - import_tasks: crm_service_status.yml
+  - import_tasks: get_ctrl_n_number.yml
+  - import_tasks: crm_online_number.yml
+  - import_tasks: mongodb_process.yml
+  - import_tasks: mysql_process.yml
+  - import_tasks: memcached.yml 
+  - import_tasks: rabbitmq_nodes.yml
+  - import_tasks: mysql_port_check.yml
+  - import_tasks: ../../log/tasks/logging.yml
+  - import_tasks: binlog_size_check.yml
+  - import_tasks: ../../log/tasks/logging.yml
+  when: inventory_hostname in groups.controller
