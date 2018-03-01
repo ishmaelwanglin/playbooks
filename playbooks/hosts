@@ -1,16 +1,15 @@
 [controller]
-172.40.0.[131:133]
+*.*.*.*
 [compute]
-192.168.210.[6:8]
+*.*.*.*
 [neutron]
 *.*.*.*
 [ceph_mon]
-172.40.0.[131:133]
-[ceph_osd]
-[zabbix]
 *.*.*.*
-[all:vars]
+[ceph_osd]
+*.*.*.*
+[zabbix_server]
+192.168.122.102
+[zabbix_server:vars]
 ansible_ssh_user=root
 ansible_ssh_pass=passw0rd
-[compute:vars]
-ansible_ssh_common_args: '-o ProxyCommand="ssh -i ~/.ssh/id_rsa -W %h:%p -q root@172.40.0.131"'

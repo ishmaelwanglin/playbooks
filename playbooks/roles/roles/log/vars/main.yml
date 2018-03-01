@@ -1,2 +1,0 @@
----
-logfile: ./es_monitor_{{ time }}.log

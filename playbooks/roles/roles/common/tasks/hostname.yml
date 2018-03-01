@@ -1,4 +1,0 @@
----
-- name: get node's hostname
-  debug:
-       var: ansible_nodename
