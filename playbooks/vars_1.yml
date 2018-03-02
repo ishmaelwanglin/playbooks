@@ -1,5 +1,0 @@
----
-- controllers: "{{groups['ctrl']}}"
-- master_node: "{{groups['ctrl'][0]}}"
-- masternodes: 3
-- openrc: /root/openrc

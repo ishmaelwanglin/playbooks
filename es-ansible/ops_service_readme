@@ -13,4 +13,4 @@ ES service team 售后操作规范
     smartctl -i -d megaraid,23 /dev/sdc | grep "Rotation Rate" 得到
     “Solid State Device”则为固态盘，非固态盘为转速。
 2、修改CPU MEMORY超售比的由另外脚本实现。
-3、CPU隔离需人工判断，暂为实现。
+3、CPU隔离需人工判断，暂未实现。

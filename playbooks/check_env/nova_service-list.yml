@@ -1,9 +1,0 @@
----
-- block:
-  - shell: >
-          source {{openrc}} && \
-          nova service-list
-    register: service_info
-  - debug: msg="{{service_info.stdout_lines}}"
-  run_once: true
-  when: inventory_hostname in groups.controller
