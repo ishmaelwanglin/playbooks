@@ -1,5 +1,0 @@
----
-- name: < get node's hostname >
-  shell: hostname -s
-  register: hostname_out
-- set_fact: hostname={{ hostname_out.stdout }}

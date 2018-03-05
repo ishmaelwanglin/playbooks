@@ -1,8 +1,0 @@
----
-- name: < initial logfile content >
-  shell: test -f {{ logfile }} && echo "" > {{ logfile }}
-- name: < write time into logfile >
-  shell: |
-      time=$(date +"%F_%T")
-      echo -e "\n[START] ==========  start check escloud  $time . ==========" >> {{ logfile }}
-...

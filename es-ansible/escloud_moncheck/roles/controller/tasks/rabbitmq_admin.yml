@@ -1,9 +1,0 @@
----
-# get_url like wget ,get rabbitmqadmin.py to used.
-- name: < wget rabbitmqadmin.py >
-  get_url:
-    url: http://{{ hostname }}:15672/cli/rabbitmqadmin
-    dest: ./rabbitmqadmin.py
-    mode: a+x
-  when: inventory_hostname == groups.controller[0]
-  delegate_to: localhost
