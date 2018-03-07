@@ -1,6 +1,0 @@
----
-- name: restart mon
-  systemd:
-      name: "ceph-mon@{{ ansible_hostname }}"
-      state: started
-  delegate_to: "{{ inventory_hostname }}"

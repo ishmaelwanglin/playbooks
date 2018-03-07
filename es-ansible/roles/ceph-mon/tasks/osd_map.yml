@@ -1,9 +1,0 @@
----
-- name: get osd map
-  shell: >
-      ceph osd stat| egrep -o "osdmap.*"
-  register:
-      osdmap_res
-- name: show osd map
-  debug:
-      var: osdmap_res.stdout

@@ -1,9 +1,0 @@
----
-- name: get mon map
-  shell: >
-      ceph mon stat|awk '{print $11}'
-  register:
-      monmap_res
-- name: show mon map of up node.
-  debug: 
-      var: monmap_res.stdout

@@ -1,4 +1,0 @@
----
-- name: 获取ceph的软件版本
-  shell: ceph --version | awk '{print $3}'
-  register: ceph_version

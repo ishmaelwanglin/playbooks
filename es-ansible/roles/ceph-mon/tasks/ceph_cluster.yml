@@ -1,9 +1,0 @@
----
-- name: get ceph cluster status
-  shell: > 
-      ceph health
-  register: clusterinfo
-- name: show ceph cluster status
-  debug:
-      var: clusterinfo.stdout
-...
