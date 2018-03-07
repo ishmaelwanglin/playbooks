@@ -1,0 +1,25 @@
+---
+- name: < file module test >
+  gather_facts: false
+  remote_user: root
+  hosts: localhost
+  tasks:
+#  - name: < file test >
+#    file: 
+#        path: /tmp/test11
+#        state: directory
+#    register: out
+#  - name: display out
+#    debug:
+#        var: out
+  - name: < file module create >
+    file:
+        path: /tmp/{{ item.key }}
+        state: "{{ item.value }}"
+    with_items:
+        - { key: test, value: "directory" }
+        - { key: test/log, value: "touch" }
+    register: file_out
+  - name: < display file_out >
+    debug:
+        var: file_out.results

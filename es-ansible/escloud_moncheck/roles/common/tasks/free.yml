@@ -1,0 +1,11 @@
+---
+- name: < get free info >
+  shell: |
+      free -m | awk '/Mem/{sum=$4+$6}END{printf "%.2f\n",sum/1024}'
+  register: free_out
+- name: < compare value to get which result will write to log file >
+  shell: test $(echo {{ free_out.stdout|int }}) -ge 9
+  ignore_errors: true
+  register: compare_out
+- set_fact: CHECK_ITEM="memory_free"
+- set_fact: WARN_VALUE="ge 9GB"

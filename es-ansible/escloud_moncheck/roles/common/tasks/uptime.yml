@@ -1,0 +1,7 @@
+---
+- name: < get uptime >
+  shell: uptime| awk -F"," '{print $1}'
+  register: uptime_out
+- name: < log uptime >
+  shell: echo "[INFO] on {{ hostname }} uptime {{ uptime_out.stdout }} ." >> {{ logfile }}
+  delegate_to: localhost

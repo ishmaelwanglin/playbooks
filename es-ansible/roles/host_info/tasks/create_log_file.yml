@@ -1,0 +1,19 @@
+---
+- name: < set_fact logfile_name >
+  set_fact:
+      logfile_name: esck_{{ date }}.log
+- name: < log file create >
+  file:
+      path: "{{ item.path }}"
+      state: "{{ item.type }}"
+  with_items:
+      - { path: /var/log/escloud_check, type: "directory" }
+      - { path: "/var/log/escloud_check/{{ logfile_name }}", type: "touch" }
+  changed_when: false
+- name: < set_fact logfile_path >
+  set_fact: 
+      logfile_path: /var/log/escloud_check/{{ logfile_name }}
+- name: < clear log file >
+  shell: test -f {{ logfile_path }} && echo "" > {{ logfile_path }}
+  args:
+      removes: "{{ logfile_path }}"

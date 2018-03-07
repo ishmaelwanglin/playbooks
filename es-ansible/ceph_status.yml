@@ -1,0 +1,7 @@
+---
+- name: get ceph cluster status
+  hosts: ceph_h
+  gather_facts: true
+  roles:
+      - ceph-mon
+...

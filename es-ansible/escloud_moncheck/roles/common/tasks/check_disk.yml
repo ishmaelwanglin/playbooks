@@ -1,0 +1,26 @@
+---
+- name: < check disk medium >
+  shell: dmesg kern |grep "Medium Error" |egrep -o "sd[a-z]"|sort -u
+  register: disk_err
+  changed_when: disk_err.stdout_lines|length != 0
+- name: display disk error
+  debug:
+       var: "{{ disk_err.stdout_lines|length }}"
+       verbosity: 1
+- name: < check file system >
+  shell: dmesg kern |grep "xfs_log_force" |egrep -o "sd[a-z][0-9]" |sort -u
+  register: fs_err
+  changed_when: fs_err.stdout_lines|length != 0
+- name: display disk fs error
+  debug:
+       var: "{{ fs_err.stdout_lines|length }}"
+       verbosity: 1
+# 记录磁盘故障和文件系统故障的日志
+- block:
+    - name: < logging disk  error >
+      shell: echo "[ERROR] on {{ hostname }} {{ disk_err.stdout }} medium error." >> {{ logfile }}
+      when: "disk_err.stdout_lines|length != 0"
+    - name: < logging fs error >
+      shell: echo "[ERROR] on {{ hostname }} {{ fs_err.stdout }} file system is error." >> {{ logfile }}
+      when: "fs_err.stdout_lines|length != 0"
+  delegate_to: localhost

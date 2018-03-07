@@ -1,0 +1,8 @@
+---
+- name: < get public vip address >
+  shell: cat /etc/haproxy/conf.d/998-dashboard-frontend.cfg |egrep -o "([0-9]{1,3}\.){3}[0-9]{1,3}"|sed -n 1p
+  register: vip_out
+- name: < set value vip_address_public >
+  set_fact:
+      vip_address_public: "{{ vip_out.stdout }}"
+...

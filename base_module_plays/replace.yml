@@ -1,0 +1,13 @@
+---
+- hosts: zabbix_server
+  gather_facts: false
+  remote_user: root
+  tasks:
+  - name: test repalce
+    replace: 
+        dest: /tmp/zabbix.conf
+        regexp: "{{ item.key }}"
+        replace: "{{ item.value }}"
+    with_items:
+        - {key: '# p', value:  'p'}
+        - {key: '\b[A-Z][a-z]+\/[A-Z].+\b', value: 'Asia/Shanghai'}

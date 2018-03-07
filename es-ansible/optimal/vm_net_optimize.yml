@@ -1,0 +1,29 @@
+---
+# 虚拟机网络优化参数
+- name: vm net args optimize
+  hosts: compute
+  gather_facts: false
+  remote_user: root
+  tasks:
+  - name: < ip link set tapxxxxx txqueuelen >
+    shell: >
+          for i in $(ip a |egrep -o tap[0-9]*);do 
+              ip link set $i txqueuelen 2000
+          done
+    ignore_errors: true
+  - name: < 60-vm-tap.rules >
+    blockinfile:
+      dest: /etc/udev/rules.d/60-vm-tap.rules
+      create: yes
+      block: |
+           ACTION=="add", KERNEL=="tap?*", RUN+="/sbin/ip link set %k txqueuelen 2000"
+      insertafter: EOF
+      state: present
+      backup: yes
+    notify: reload rules
+  - name: < reload rules >
+    meta: flush_handlers
+  handlers:
+  - name: reload rules
+    shell: /sbin/udevadm control --reload-rules
+...

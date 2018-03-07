@@ -1,0 +1,11 @@
+---
+- name: < get ceph osd stat >
+  shell: ceph osd stat|awk '/osdmap/{not_in=($3-$7);not_up=($3-$5)}END{print "not_in,not_up is:",not_in,not_up}'
+  register: osd_stat_out
+- name: < compare value >
+  shell: echo {{ osd_stat_out }} |grep "0"
+  ignore_errors: true
+  register: compare_out
+- set_fact: 
+    CHECK_ITEM="osd_stat"
+    WARN_VALUE="down"

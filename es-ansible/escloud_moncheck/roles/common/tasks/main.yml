@@ -1,0 +1,11 @@
+---
+- include: get_host_name.yml
+- include: get_controller_nodes.yml
+- include: os_root.yml
+- include: uptime.yml
+- include: check_disk.yml
+- include: free.yml
+- include: ../../log/tasks/logging.yml
+- include: free_ratio.yml
+- include: ../../log/tasks/logging.yml
+...

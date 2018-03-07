@@ -1,0 +1,55 @@
+# useage: ansible-playbook basename -e "host=node-? cpu=? mem=?"
+- name: change < cpu|mem > ratio
+  hosts: compute
+  gather_facts: false
+  remote_user: root
+  vars: 
+      hostname: "{{ host }}"
+      cpu: "{{ cpu_ratio }}"
+      mem: "{{ mem_ratio }}"
+      nova_conf: /tmp/nova.conf
+      conf_file: "{{ conf_file }}"
+      key: "{{ key }}"
+      value: "{{ value }}"
+  tasks:
+  - name: if host undefined failed.
+    fail: msg="value <host> is undefined!"
+    when: host is undefined
+  - name: change node-? to ip address in inventory
+    shell: cat /etc/hosts |awk '/{{ hostname }}/{print $1}' 
+    ignore_errors: true
+    register: node_name
+    changed_when: node_name.rc != 0
+  - name: debug cpu_ratio
+    debug:
+         var: cpu_ratio 
+    when: cpu is defined
+    ignore_errors: true
+    notify: restart compute
+  - name: change cpu ratio
+    ini_file:
+        path: "{{ nova_conf }}"
+        backup: yes
+        section: DEFAULT 
+        state: present
+        option: cpu_allocation_ratio
+        value: "{{ cpu_ratio }}"
+    when: inventory_hostname == node_name.stdout and cpu is defined
+    ignore_errors: true
+  - name: change memory ratio 
+    ini_file: 
+        path: "{{ nova_conf }}"
+        backup: yes
+        section: DEFAULT
+        state: present
+        option: ram_allocation_ratio
+        value: "{{ mem_ratio }}"
+    when: inventory_hostname == node_name.stdout and mem is defined
+    ignore_errors: true
+    notify: restart compute
+  handlers: 
+  - name: restart compute
+    systemd:
+        name: openstack-nova-compute
+        state: restarted
+... 

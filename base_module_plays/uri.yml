@@ -1,0 +1,13 @@
+---
+- hosts: localhost
+  gather_facts: false
+  tasks:
+  - name: curl www.baidu.com
+    uri:
+        url: https://www.baidu.com
+        method: HEAD
+        return_content: yes
+    register: webpage
+  - name: display webpage
+    debug:
+        var: webpage

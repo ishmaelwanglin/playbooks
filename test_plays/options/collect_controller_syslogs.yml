@@ -1,0 +1,38 @@
+---
+- name: 收集系统日志
+  gather_facts: no
+  hosts: controller
+  vars:
+    messages: /var/log/messages
+    dmesg: /var/log/dmesg
+    nova-api: /var/log/nova/nova-api.log
+    nova-scheduler: /var/log/nova/nova-scheduler.log
+    nova-conductor: /var/log/nova/nova-conductor.log
+    dhcp-agent: /var/log/neutron/dhcp-agent.log
+    l3-agent: /var/log/neutron/l3-agent.log
+    lbaasv2-agent: /var/log/neutron/lbaasv2-agent.log
+    metadata-agent: /var/log/neutron/metadata-agent.log
+    openvswitch-agent: /var/log/neutron/openvswitch-agent.log
+    server-log: /var/log/neutron/server.log
+    cinder-api: /var/log/cinder/api.log
+    cinder-volume: /var/log/cinder/volume.log
+    cinder-scheduler: /var/log/cinder/scheduler.log
+  tasks:
+    - name: node name
+      shell: hostname
+      register: node_name
+    - debug:
+            var: node_name.stdout
+            verbosity: 1
+    - name: mkdir node_name
+      file: path=/tmp/logs/{{node_name.stdout}} state=directory
+      register: info
+      delegate_to: localhost
+    - debug:
+            var: info.path
+            verbosity: 0
+    - name: shell 把日志复制到本地/tmp/logs/node-？目录
+      shell: scp {{node_name.stdout}}:{{item}} /tmp/logs/{{node_name.stdout}}
+      with_items:
+                - "{{messages}}"
+      delegate_to: localhost

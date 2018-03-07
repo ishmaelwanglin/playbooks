@@ -1,0 +1,16 @@
+ES service team 售后操作规范
+已实现部分
+1、修改NTP，node-1为ntp server,其他节点指向node-1进行同步。
+2、移除rsyslog、nailgun、mcollection agent。
+3、计算节点宿主机内存预留。
+4、设置mini_free,防止oom。
+5、设置memcache内存cache。
+6、设置mongoDB占用缓存大小。
+7、设置DHCP租期。
+另外部分：
+1、SSD盘的noop调度算法，由于识别ssd盘的方式不明确，暂未实现。
+    lsscsi命令序号第三个是raid n 的序号；
+    smartctl -i -d megaraid,23 /dev/sdc | grep "Rotation Rate" 得到
+    “Solid State Device”则为固态盘，非固态盘为转速。
+2、修改CPU MEMORY超售比的由另外脚本实现。
+3、CPU隔离需人工判断，暂未实现。

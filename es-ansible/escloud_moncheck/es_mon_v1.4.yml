@@ -1,0 +1,16 @@
+---
+- name: inspection script for Easystack.Ops v 1.4 
+  remote_user: root
+  gather_facts: false
+  any_errors_fatal: false
+  vars_files:
+    - extra_vars.yml
+  hosts: all
+  roles:  
+  - log
+  - common
+  - net
+  - controller
+  - ceph-mon 
+  - compute
+  - { role: sgcc, when: "{{ for_sgcc }} == true" }

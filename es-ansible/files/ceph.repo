@@ -1,0 +1,11 @@
+[ceph-deploy]
+name=ceph-deploy
+baseurl=https://mirrors.aliyun.com/ceph/rpm-luminous/el7/noarch/
+enabled=1
+gpgcheck=0
+
+[ceph_l]
+name=ceph-luminous
+baseurl=https://mirrors.aliyun.com/ceph/rpm-luminous/el7/x86_64/
+enabled=1
+gpgcheck=0

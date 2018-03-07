@@ -1,0 +1,5 @@
+ansible-playbook 脚本使用说明 - ES.Ops
+
+1、执行PLAYBOOK脚本的方式，一般为ansible-playbook playbook_scritps_name
+2、 -i 参数可以指定 inventory文件， inventory文件即hosts文件，模板见files文件夹下hosts文件
+3、 -f 参数可以指定 forks数即并发进程数，默认不指定为5

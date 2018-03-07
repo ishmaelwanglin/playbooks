@@ -1,0 +1,6 @@
+---
+- name: < check mgmt network >
+  shell: ping -c 2 -i 0.01 {{ inventory_hostname }}
+  register: compare_out
+- set_fact: CHECK_ITEM="mgmt_network"
+- set_fact: WARN_VALUE="pong"

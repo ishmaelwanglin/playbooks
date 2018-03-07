@@ -1,0 +1,10 @@
+---
+- block:
+  - name: check cinder service-list
+    shell: >
+          source {{openrc}} && \
+          cinder service-list
+    register: cinder_stat
+    debug: msg="{{cinder_stat.stdout_lines}}"
+  when: inventory_hostname in groups.controller
+  run_once: true

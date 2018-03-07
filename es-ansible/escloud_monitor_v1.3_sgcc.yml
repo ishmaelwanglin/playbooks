@@ -1,0 +1,461 @@
+---
+- name: escloud monitor  巡检脚本
+  hosts: all
+  remote_user: root
+  gather_facts: false
+#  vars_prompt:
+#    - name: vip
+#      prompt: "Input <VIP> address > "
+#      default: "172.16.20.2"
+#      private: no
+#      confirm: no
+  pre_tasks:
+  - name: get vip
+    shell: cat /etc/haproxy/conf.d/998-dashboard-frontend.cfg |egrep -o "([0-9]{1,3}\.){3}[0-9]{1,3}"|sed -n 1p
+    register: vip_info
+    when: inventory_hostname in groups.controller
+  - set_fact: vip={{ vip_info.stdout }}
+  tasks:
+# 获取每个服务器的hostname
+  - block:
+    - name: 获取节点的主机名
+      shell: hostname -s
+      register: hostname_res
+    - set_fact: nodename={{ hostname_res.stdout }}
+    when: inventory_hostname in play_hosts
+    tags: get_host
+# 获取控制节点数量
+  - name: < count of controller nodes >
+    shell: cat /etc/haproxy/conf.d/020-keystone-1.cfg |grep server | awk '{print $2}'| wc -l
+    register: res_ctrl_count
+  - set_fact: controllers={{ res_ctrl_count.stdout|int }}
+
+# 创建脚本的运行日志，记录运行过程及结果
+  - block:
+    - name: 获取当前日期
+      shell: date +"%F"
+      register: date
+    - set_fact: logfile="/var/log/escloud_check/esck_{{ date.stdout }}.log"
+    - name: 创建日志文件夹
+      file: 
+          path: /var/log/escloud_check
+          state: directory
+    - name: 创建日志文件
+      file:
+          path: "{{ logfile }}" 
+          state: touch
+    - name:  如果存在日志文件，清空内容
+      shell: test -f {{ logfile }} && echo "" > {{ logfile }}
+    - name: 记录时间
+      shell: |
+             time=$(date +"%F_%T")
+             echo -e "\n[START] ==========  start check escloud  $time . ==========" >> {{ logfile }}
+    delegate_to: localhost
+    run_once: true
+    tags: logging
+  
+# 检测可用内存
+  - name: 获取内存的free值
+    shell: >
+             free -m | awk '/Mem/{sum=$4+$6}END{printf "%.2f\n",sum/1024}'
+    register: free_mem
+#记录内存检测日志
+  - block:
+    - name: < memory is successful. >
+      shell: echo "[INFO] on {{ nodename }} free memory left {{ free_mem.stdout }} GB." >> {{ logfile }}
+      when: free_mem.stdout|int >= 9
+    - name: < memory is failed! >
+      shell: >
+             echo "[WARN] on {{ nodename }} free memory only left {{ free_mem.stdout }} GB." >> {{ logfile }}
+      when: free_mem.stdout|int < 9
+    delegate_to: localhost
+# 检测内存剩余比例
+  - block:
+    - name: < get free ratio >
+      shell: free| awk '/Me/{printf "%d",$7*100/$2}'
+      register: free_info
+    - set_fact: free_ratio={{ free_info.stdout }}
+    - name: < mem ratio logging >
+      shell: echo "[WARN] on {{ nodename }} available memory ratio less than 10%." >> {{ logfile }}
+      delegate_to: localhost
+      when: free_ratio|int <= 10
+    - name: < Memory ratio is OK. >
+      shell: echo "[INFO] on {{ nodename }} available memory ratio is {{ free_ratio }} ." >> {{ logfile }}
+      delegate_to: localhost
+      when: free_ratio|int > 10
+
+# 检查网络情况
+  - block:
+    - name: < 检查管理网 >
+      shell: ping -c 2 -i 0.01 {{ inventory_hostname }}
+      register: net_info
+    - name: < network is failed >
+      shell: echo "[WARN] {{ inventory_hostname }} net is failed!" >> {{ logfile }}
+      when: net_info.rc != 0
+    - name: < network is successfull >
+      shell: echo "[INFO] {{ inventory_hostname }} net is successfull." >> {{ logfile }}
+      when: net_info.rc == 0
+    delegate_to: localhost
+# 检查mysql数据库服务,端口是否可访问
+  - block:
+    - name: 获取mysql的服务器地址
+      shell: hostname -i 
+      register: mysql_ip
+    - name: < 获取mariadb的端口状态 >
+      wait_for:
+           port: 3307
+           delay: 1
+           timeout: 2
+           host: "{{ mysql_ip.stdout }}"
+      register: db_info
+    - name: < "{{ db_info.port }} 端口是关闭的!" >
+      shell: echo "[WARN] on {{ inventory_hostname }} {{ db_info.port }} port is closed!" >> {{ logfile }}
+      delegate_to: localhost
+      when: db_info.state != "started"
+    - name: <"{{ db_info.port }} 端口是可连接的!">
+      shell: echo "[INFO] on {{ inventory_hostname }} {{db_info.port }} port is successful." >> {{ logfile }}
+      delegate_to: localhost
+      when: db_info.state == "started"
+    when: inventory_hostname in groups.controller
+#二进制日志，这段有些问题。需要研究
+  - block:
+    - name: < check bin log's size >
+      shell: mysql -uroot -e "SHOW BINARY LOGS;" |tail -1|awk '{print $2}'
+      register: bin_info
+    - set_fact: bin_size={{ bin_info.stdout }}
+    - debug: 
+           var: bin_size
+           verbosity: 1
+    - name: < display bin log's size >
+      shell: echo "[INFO] Check binary logs size in  MySQL database" >> {{ logfile }}
+      delegate_to: localhost
+      when: bin_size|int >= 100000000
+    - name: < bin logging >
+      shell: echo "[WARN] on {{ inventory_hostname }} Check binary logs size in  MySQL database" >> {{ logfile }}
+      delegate_to: localhost
+      when: bin_size|int < 100000000
+    when: inventory_hostname in groups.controller
+# check_ceph_cluster
+  - block:
+    - name: < Ceph cluster status >
+      shell: ceph health detail
+      register: ceph_health_info
+    - name: < HEALTH OK !>
+      shell: echo "[INFO] on {{ nodename }} < HEALTH is OK !>" >> {{ logfile }}
+      when: ceph_health_info.stdout|search("OK")
+      delegate_to: localhost
+    - name: < HEALTH WARN !>
+      shell: echo "[WARN] on {{ nodename }} {{ ceph_health_info.stdout }}" >> {{ logfile }}
+      when: not ceph_health_info.stdout|search("OK")
+      delegate_to: localhost
+    when: inventory_hostname in groups.ceph_mon
+# 检测OSD是否down，还需调整
+  - block:
+    - name: < check osd stat >
+      shell: |
+            ceph osd tree | \
+            awk '{if($0~"node"){a=$4}else if($0~"osd" && $4=="down"){print a}}'|uniq -c 
+      register: osd_stat
+    - name: < osd stat logging >
+      shell: |
+             for osd in {{ osd_stat.stdout_lines }};do
+                 echo "[WARN] ${osd}" >> {{ logfile }}
+             done
+      when: osd_stat.stdout|length != 0
+      delegate_to: localhost
+    when: inventory_hostname in groups.ceph_mon
+# 检查计算节点的服务状态
+  - block:
+    - set_fact: compute_services="libvirt nova-compute neutron-openv"
+    - name: < 计算节点的服务状态 >
+      shell: |
+            for i in {{ compute_services }};do
+            n=$(ps -A | grep $i | wc -l)
+            if [ $n -eq 0 ];then
+              echo "[WARN] on {{ nodename }} ${i}.service is not running."
+            else
+              echo "[INFO] On {{ nodename }} ${i}.service is running." 
+            fi
+            done
+      register: compute_services_stat
+    - name: < logging compute nodes state > 
+      shell: echo "{{ compute_services_stat.stdout }}" >> {{ logfile }}
+      delegate_to: localhost
+    when: inventory_hostname in groups.compute
+    tags: compute_service 
+
+# check_escloud_service controller 
+  - block:
+    - set_fact: controller_services="mysql haproxy rabbitmq mongo nova-api nova-novncproxy nova-objectstor nova-consoleaut \
+                                     nova-conductor nova-cert nova-scheduler neutron-openvsw neutron-rootwra \
+                                     neutron-metadat neutron-server neutron-ns-meta neutron-dhcp-ag neutron-l3-agen \
+                                     cinder-backup cinder-api cinder-volume cinder-schedule"
+    - name: < gather escloud services on controller >
+      shell: |
+            for i in {{ controller_services }};do
+            n=$(ps -A | grep $i | wc -l)
+            if [ $n -eq 0 ];then
+              echo "[WARN] on {{ nodename }} ${i}.service is not running."
+            else
+              echo "[INFO] on {{ nodename }} ${i}.service is running."
+            fi
+            done
+      register: controller_services_stat
+    - name: < controller service state logging >
+      shell: echo "{{ controller_services_stat.stdout }}" >> {{ logfile }}
+      delegate_to: localhost
+    when: inventory_hostname in groups.controller
+# 检查crm状态
+  - block:
+    - name: < Pacemaker cluster online nodes >
+      shell: crm  status | grep Online | egrep -o "node-[[:digit:]]+"| wc -w
+      register: res_online_count
+    - name: < CRM logging >
+      shell: |
+             for i in $(seq {{ controllers }});do
+                 test node-$i == $(echo {{ res_online_count.stdout }} | awk -v n=$i '{print $n}')  || \
+                 echo "[WARN] on node-$i , pacemaker service is offline." >> {{ logfile }}
+             done
+      delegate_to: localhost
+      when: res_online_count.stdout|int < res_ctrl_count.stdout|int
+    - shell: echo "[INFO] on {{ nodename }} , CRM服务在线节点服务正常" >> {{ logfile }}
+      delegate_to: localhost
+      when: res_online_count.stdout|int == res_ctrl_count.stdout|int
+    when: inventory_hostname in groups.controller
+#检查RabbitMQ集群节点数
+  - block:
+    - name: < 检查rabbitmq >
+      shell: |
+             rabbitmqctl cluster_status | grep "running_nodes" | \
+             egrep -o "rabbit.*[[:digit:]]" | awk 'BEGIN{FS=","}{print NF}'
+      register: running_node
+    - name: < Display rabbitmq-server running nodes >
+      shell: |
+            echo "[INFO]  Current running rabbimq-server is {{ running_node.stdout }}" >> {{ logfile }}
+      delegate_to: localhost
+      when: running_node.stdout|int == {{ controllers }}
+    - name: < RabbitMQ cluster is WARN! >
+      shell: echo "[WARN]  RabbitMQ cluster is not OK!" >> {{ logfile }}
+      delegate_to: localhost
+      when: running_node.stdout|int != {{ controllers }}
+    - name: < RabbitMQ cluster is OK. >
+      shell: echo "[INFO]  RabbitMQ cluster is OK!" >> {{ logfile }}
+      delegate_to: localhost
+      when: running_node.stdout|int == {{ controllers }}
+    when: inventory_hostname in groups.controller
+# check mongo process
+  - block:
+    - name: < mongod  pid >
+      shell: cat /var/run/mongodb/mongod.pid
+      register: mongod_pid
+    - name: < mongod  物理内存 >
+      shell: ps -o rss -p {{ mongod_pid.stdout }} | awk /[[:digit:]]/'{print $1/1024}'
+      register: mongod_rss
+    - debug:
+            var: mongod_rss.stdout
+            verbosity: 1
+    - name: < mongod  memory used ratio >
+      shell: ps -o pmem {{ mongod_pid }} | sed -n 2p
+      register: mongod_pmem
+    - debug:
+            var: mongod_pmem.stdout
+            verbosity: 1
+    - name: < mongo内存占用异常 >
+      shell: |
+             echo "[WARN] on {{ nodename }} Mongod process using {{ mongod_rss.stdout }} MB memory, \
+             {{ mongod_pmem.stdout }} percentage of system memory." >> {{ logfile }}
+      delegate_to: localhost
+      when: mongod_rss.stdout|int >= 10000 or mongod_pmem.stdout|int >=20
+    - name: < mongo内存占用正常 >
+      shell: |
+             echo "[INFO] mongod process using {{ mongod_rss.stdout }} MB memory,  \
+                  {{ mongod_pmem.stdout }} percentage of system memory." >> {{ logfile }}
+      delegate_to: localhost
+      when: mongod_rss.stdout|int < 10000 and mongod_pmem.stdout|int < 20
+    when: inventory_hostname in groups.controller
+# 检查mysql的内存占用比,OK!
+  - block:
+    - name: < 获取mysql pid >
+      shell: cat /var/run/mysql/mysqld.pid
+      register: mysql_pid
+    - name: < 获取mysql 物理内存 >
+      shell: ps -o rss -p {{ mysql_pid.stdout }} | awk /[[:digit:]]/'{printf "%.2f",$1/1024}'
+      register: mysql_rss
+    - debug:
+            var: mysql_rss.stdout
+            verbosity: 1
+    - name: < mysql 内存占用百分比 >
+      shell: ps -o pmem {{ mysql_pid.stdout }} | sed -n 2p
+      register: mysql_pmem
+    - debug:
+            var: mysql_pmem.stdout
+            verbosity: 1
+    - name: < mysql资源占用异常 >
+      shell: |
+             echo "[WARN] on {{ nodename }} mysql process using {{ mysql_rss.stdout }} MB memory, \
+             {{ mysql_pmem.stdout }} percentage of system memory." >> {{ logfile }}
+      delegate_to: localhost
+      when: mysql_rss.stdout|int >= 10000 or mysql_pmem.stdout|int >=10
+    - name: < mysql资源占用正常 >
+      shell: echo "[INFO] mysql process using {{ mysql_rss.stdout }} MB memory, \
+                  {{ mysql_pmem.stdout }} percentage of system memory." >> {{ logfile }}
+      delegate_to: localhost
+      when: mysql_rss.stdout|int < 10000 or mysql_pmem.stdout|int < 10
+    when: inventory_hostname in groups.controller
+# check_os_root_ratio
+  - block:
+    - name: < get os-root ratio >
+      shell: df -h | awk '/dev.*root/{print $5}' | egrep -o "[[:digit:]]{1,3}"
+      register: root_info
+    - set_fact: root_ratio={{ root_info.stdout }}
+    - name: < root ratio logging >
+      shell: echo "[WARN] on {{ nodename }}, root partition ratio is grater than 80%, please expend disk." >> {{ logfile }}
+      delegate_to: localhost
+      when: root_ratio|int >= 80
+    - name: < os-root is OK >
+      shell: echo "[INFO] on {{ nodename }}, root partition is ok" >> {{ logfile }}
+      delegate_to: localhost
+      when: root_ratio|int < 80
+# 获取mongodb挂载点空间占用
+  - block:
+    - name: < 获取mongodb挂载点磁盘空间占用比例 >
+      shell: df -h|awk '/mongo-mongodb/{print $5}'| egrep -o "[[:digit:]]{1,3}"
+      register: mongo_info
+    - set_fact: mongo_ratio={{ mongo_info.stdout }}
+    - name: < mongo_disk_ratio logging >
+      shell: echo "[WARN] on {{ nodename }} mongo partition ratio is grater than 80%, please expend disk" >> {{ logfile }}
+      delegate_to: localhost
+      when: mongo_ratio|int >= 80
+    - name: < mongo_disk_ratio is OK >
+      shell: echo "[INFO] on {{ nodename }} mongo partition is ok" >> {{ logfile }}
+      delegate_to: localhost
+      when: mongo_ratio|int < 80
+    when: inventory_hostname in groups.controller
+# check_nova_disk_ratio
+  - block:
+    - name: < /var/lib/nova挂载点磁盘空间占用比例 >
+      shell: df -h| awk '/nova/{print $5}'
+      register: nova_info
+    - set_fact: nova_ratio={{ nova_info.stdout }} 
+    - name: < nova_disk_ratio logging >
+      shell: echo "[WARN] on {{ nodename }} nova partition ratio is greater than 80%, please expend disk" >> {{ logfile }}
+      delegate_to: localhost
+      when: nova_ratio|int >= 80
+    - name: < nova_disk_ratio is OK >
+      shell:  echo "[INFO] on {{ nodename }} nova partition is ok." >> {{ logfile }}
+      delegate_to: localhost
+      when: nova_ratio|int < 80
+    when: inventory_hostname in groups.compute
+# check_osd_ratio
+  - block:
+    - name: < OSD节点的每个OSD盘的空间占用比例 >
+      shell: df -h|awk '/ceph\/osd/{gsub(/%/,"");if($5>=80){print "[WARN]" $1,$5"%",$6}}'
+      register: osd_info
+    - name: < osd_ratio logging >
+      shell: >
+             echo -e "[INFO] on {{ nodename }} osd ratio list  \n{{ osd_info.stdout }}" >> {{ logfile }}
+      delegate_to: localhost
+      when: osd_info.stdout|length != 0
+    when: inventory_hostname in groups.ceph_osd
+  - name: 每个计算点上的虚拟机数量
+    shell: |
+         virsh list --all |awk -v sumrun=0 -v sumstop=0  \
+         '/instance/{if($3=="running"){sumrun+=1}else if($3!="running"){sumstop+=1}} \
+         END{print "running vm",sumrun,"; stop vm",sumstop}'
+    register: vms_info
+    when: inventory_hostname in groups.compute
+  - name: logging vms_info
+    shell: >
+          echo -e "[INFO] on {{ nodename }} {{ vms_info.stdout }}" >> {{ logfile }}
+    when: inventory_hostname in groups.compute
+    delegate_to: localhost
+# 版本 1.3 增加检测 磁盘及文件系统故障
+  - name: 检测磁盘故障
+    shell: dmesg kern |grep "Medium Error" |egrep -o "sd[a-z]" | sort -u
+    register: disk_err
+    changed_when: "{{ disk_err.stdout_lines|length }} != 0 "
+  - name: display disk error
+    debug: 
+         var: "{{ disk_err.stdout_lines|length }}"
+         verbosity: 1
+  - name: 检测磁盘文件系统故障
+    shell: dmesg kern |grep "xfs_log_force" |egrep -o "sd[a-z][0-9]" |sort -u
+    register: fs_err
+    changed_when: "{{ fs_err.stdout_lines|length }} != 0"
+  - name: display disk fs error
+    debug: 
+         var: "{{ fs_err.stdout_lines|length }}"
+         verbosity: 1
+# 记录磁盘故障和文件系统故障的日志
+  - block:
+    - name: logging disk  error
+      shell: echo "[ERR] on {{ nodename }} {{ disk_err.stdout }} medium error." >> {{ logfile }}
+      when: "{{ disk_err.stdout_lines|length }} != 0"
+    - name: logging fs error
+      shell: echo "[ERR] on {{ nodename }} {{ fs_err.stdout }} file system is error." >> {{ logfile }}
+      when: "{{ fs_err.stdout_lines|length }} != 0"
+    delegate_to: localhost
+#sgcc版本增加 curl , uri模块的方法还需研究
+  - name: curl vip to get info
+    uri: 
+        url: http://{{ vip }}
+        method: HEAD
+    register: curl_info
+    when: inventory_hostname in groups.controller
+  - block:
+    - name: curl info if it is ok.
+      shell: echo "[INFO] on {{ nodename }} visit vip is ok." >> {{ logfile }}
+      when: curl_info.status == 200
+    - name: curl info if it is failed.
+      shell: echo "[WARN] on {{ nodename }} visit vip is failed!" >> {{ logfile }}
+      when: curl_info.status != 200 
+    delegate_to: localhost
+    when: inventory_hostname in groups.controller
+# 访问SOAP接口返回xml
+  - block:
+    - name: 获取每个控制节点的public ip地址
+      shell: cat /etc/sysconfig/network-scripts/ifcfg-br-ex |awk -F"=" '/IPADDR/{print $2}'
+      register: public_ip_info
+    - set_fact: public_ip={{ public_ip_info.stdout }}
+    - name: visiting controller nodes public ip 
+      uri:  
+          url: http://{{ public_ip }}:7789/SOAP?wsdl
+          method: HEAD
+      register: xml_info
+    - name:  SOCKET is 200 ,logging .
+      shell: echo "[INFO] on {{ nodename }} visit {{ public_ip }}:7789/SOAP?wsdl is OK." >> {{ logfile }}
+      when: xml_info.status == 200
+      delegate_to: localhost
+    - name: SOCKET is not 200 , logging .
+      shell: echo "[WARN] on {{ nodename }} visit {{ public_ip }}:7789/SOAP?wsdl is Failed!" >> {{ logfile }}
+      when: xml_info.status != 200
+      delegate_to: localhost
+    when: inventory_hostname in groups.controller
+# 11-21 增加检测memcached服务的内存使用情况
+  - block:
+    - name: 检查memcached的内存占用情况
+      shell: ps -o "pcpu,pmem,rss" -C memcached |sed -n '$p'
+      register: memcached_res
+    - set_fact:
+          memcached_pcpu: "{{ memcached_res.stdout.split()[0] }}"
+          memcached_pmem: "{{ memcached_res.stdout.split()[1] }}"
+          memcached_rss: "{{ memcached_res.stdout.split()[2] }}"
+    when: inventory_hostname in groups.controller
+  - block:
+    - name: 将memcached的内存信息写入日志<10%
+      shell: echo "[INFO] on {{ nodename }} memcached used memory {{ memcached_pmem }} , ratio is ok." >> {{ logfile }}
+      when: memcached_pmem|int < 10
+    - name: 将memcached的内存信息写入日志>10%
+      shell: echo "[WARN] on {{ nodename }} memcached used memory {{ memcached_pmem }} , ratio is grater than 10%!" >> {{ logfile }}
+      when: memcached_pmem|int >= 10
+    when: inventory_hostname in groups.controller
+    delegate_to: localhost
+
+# 日志巡检结束
+  - block:
+    - name: logging over
+      shell: >
+             echo -e "[OVER] ==================== check escloud is over. ====================\n" >> {{ logfile }}
+    delegate_to: localhost
+    run_once: true
+...

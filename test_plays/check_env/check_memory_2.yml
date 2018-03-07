@@ -1,0 +1,14 @@
+---
+- hosts: ctrl
+  gather_facts: no
+  vars: 
+    - controllers: "{{groups['ctrl']}}"
+    - master_node: "{{groups['ctrl'][0]}}"
+    - masternodes: 3
+  tasks:
+  - block:
+    - name: check memory
+      shell: free -h|awk '/Mem/{sum=$4+$7}END{print sum}'
+      register: res
+    - name: display res
+      debug:  msg="内存 {{res.stdout}}"

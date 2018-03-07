@@ -1,0 +1,23 @@
+---
+- name: < get current date >
+  shell: date +"%F"
+  register: date_out
+- name: < set log_file >
+  set_fact: 
+      log_file: "escloud_{{ date_out.stdout }}"
+- name: < set log_dir >
+  set_fact:
+      log_dir: "/var/log/escloud_check"
+- name: < create log file on node-1 >
+  file:
+      path: "{{ item.path }}"
+      state: "{{ item.type }}"
+  with_items:
+      - { path: "{{ log_dir }}", type: "directory" }
+      - { path: "{{ log_dir }}/{{ log_file }}", type: "touch" }
+  register: file_out 
+- name: < set value logfile >
+  set_fact: 
+      logfile: "{{ item.item.path }}"
+  when: item.state == "file"
+  with_items: "{{ file_out.results }}"

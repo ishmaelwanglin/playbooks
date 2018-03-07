@@ -1,0 +1,20 @@
+---
+- name: ceph slow request, deepscrub
+  gather_facts: false
+  remote_user: root
+  serial: 50
+  hosts: all
+  vars:
+    - osd_scrub_chunk_min: 1
+    - osd_scrub_chunk_max: 1
+    - osd_scrub_sleep: 3
+    - osd_scrub_max_interval: 2592000
+#sdfasdfasdf
+
+    - osafkjlkdsafioidsaflkadslkfsadfasdfasdfasdfasfdasfd_scrub_load_threshold: 20
+    - osd_scrub_begin_hour: 1
+    - osd_scrub_end_hour: 10
+    - ceph_deploy_dir: /root
+    - ceph_dir: /etc/ceph
+  tasks:
+  - name:         

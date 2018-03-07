@@ -1,0 +1,4 @@
+---
+- block:
+  - include: osd_disk_ratio.yml
+  when: inventory_hostname in groups.ceph_osd

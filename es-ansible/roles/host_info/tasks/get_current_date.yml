@@ -1,0 +1,8 @@
+---
+- name: < get current date >
+  shell: date +"%F"
+  changed_when: false
+  register: date_out
+- name: < set_fact date >
+  set_fact:
+      date: "{{ date_out.stdout }}"

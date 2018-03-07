@@ -1,0 +1,7 @@
+---
+- block: 
+  - include: create_log_file.yml
+  - include: initial_log_file.yml
+  delegate_to: localhost
+  run_once: true
+...

@@ -1,0 +1,3 @@
+---
+- include: mgmt_net_check.yml
+- include: ../../log/tasks/logging.yml

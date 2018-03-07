@@ -1,0 +1,17 @@
+---
+- name: check_crm_stat
+  gather_facts: false
+  hosts: ctrl[0]
+  tasks:
+  - block:
+    - name: 在线的节点数
+      shell: crm  status | grep Online | cut -c 9-| egrep -o "node-[[:digit:]]+"| wc -w
+      register: res_online_count
+    - name: 控制节点的个数
+      shell: cat /etc/haproxy/conf.d/020-keystone-1.cfg |grep server | awk '{print $2}'| wc -l
+      register: res_ctrl_count
+    - fail: msg="CRM服务节点服务异常"
+      when: res_online_count|int < res_ctrl_count|int
+    - debug: msg="CRM服务节点服务正常"
+      when: res_online_count|int == res_ctrl_count|int
+    run_once: true

@@ -1,0 +1,6 @@
+---
+nova_compute_services:
+  - openstack-nova-compute.service
+  - openstack-ceilometer-compute.service
+  - neutron-openvswitch-agent.service
+  - libvirtd

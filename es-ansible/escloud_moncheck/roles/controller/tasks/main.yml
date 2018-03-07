@@ -1,0 +1,16 @@
+---
+- block:
+  - include: get_public_vip.yml
+  - include: service_status.yml
+  - include: crm_service_status.yml
+  - include: get_ctrl_n_number.yml
+  - include: crm_online_number.yml
+  - include: mongodb_process.yml
+  - include: mysql_process.yml
+  - include: memcached.yml 
+  - include: rabbitmq_nodes.yml
+  - include: mysql_port_check.yml
+  - include: ../../log/tasks/logging.yml
+  - include: binlog_size_check.yml
+  - include: ../../log/tasks/logging.yml
+  when: inventory_hostname in groups.controller

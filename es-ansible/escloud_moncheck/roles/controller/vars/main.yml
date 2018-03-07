@@ -1,0 +1,48 @@
+---
+nova_compute_services:
+  - openstack-nova-api.service
+  - openstack-nova-novncproxy.service
+  - openstack-nova-cert.service
+  - openstack-nova-conductor.service
+  - openstack-nova-consoleauth.service
+  - openstack-nova-novncproxy.service
+  - openstack-nova-scheduler.service
+neutron_server_services:
+  - neutron-dhcp-agent.service
+  - neutron-l3-agent.service
+  - neutron-lbaasv2-agent.service
+  - neutron-metadata-agent.service
+  - neutron-openvswitch-agent.service
+  - neutron-server.service
+glance_services:
+  - openstack-glance-api.service
+  - openstack-glance-registry.service
+cinder_services:
+  - openstack-cinder-api.service
+  - openstack-cinder-backup.service
+  - openstack-cinder-scheduler.service
+  - openstack-cinder-volume.service
+heat_servives:
+  - openstack-heat-api-cfn.service
+  - openstack-heat-api-cloudwatch.service
+  - openstack-heat-api.service
+trove_servies:
+  - openstack-trove-api.service
+  - openstack-trove-conductor.service
+  - openstack-trove-taskmanager.service
+ceilometer_services:
+  - openstack-ceilometer-api.service
+  - openstack-ceilometer-collector.service
+  - openstack-ceilometer-notification.service
+  - openstack-aodh-api.service
+  - openstack-aodh-listener.service
+  - openstack-aodh-notifier.service
+ironic_services:
+  - openstack-ironic-api.service
+keystone_services:
+  - openstack-keystone.service
+magnum_services:
+  - openstack-magnum-api.service
+common_services:
+#  - rabbitmq-server.service
+  - mongod.service

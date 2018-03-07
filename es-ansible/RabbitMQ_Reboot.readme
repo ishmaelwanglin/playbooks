@@ -1,0 +1,12 @@
+
+说明：
+1、脚本是用来在CENTOS7以上的系统来执行的，目前支持L、M版本的环境
+2、脚本实现了自动重启rabbitmq-server服务后的自动启动全部需要重启的openstack服务
+3、由于CRM的服务容易卡住，所以可以针对实际情况选择是否执行脚本中CRM资源的服务
+4、neutron-ovs-cleanup 服务重启会删除所有port、bridge，所以不能重启这个服务，必须过滤掉
+执行方式：
+1、正常执行playbook,即执行脚本全部task的方式： ansible-playbook RabbitMQ_Reboot.yml 
+2、执行脚本时不执行crm资源服务的重启： ansible-playbook RabbitMQ_Reboot.yml -t untagged
+3、只执行tags为crm的tasks的方式：ansible-playbook RabbitMQ_Reboot.yml -t tagged 
+
+如有疑问，联系ES.Ops

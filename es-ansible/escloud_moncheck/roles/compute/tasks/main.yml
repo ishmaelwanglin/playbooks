@@ -1,0 +1,5 @@
+---
+- block:
+  - include: compute_service_status.yml
+  - include: vms_number.yml
+  when: inventory_hostname in groups.compute

@@ -1,0 +1,18 @@
+---
+- name: test 1
+  hosts: localhost
+  gather_facts: no
+  vars: 
+    vip: "172.16.20.2"
+  tasks:
+  - name: curl vip to get info
+    uri:
+        url: http://{{ vip }}
+        method: HEAD
+        follow_redirects: none
+        status_code: 301
+    register: curl_info
+    ignore_errors: true
+  - name: debug
+    debug:
+      var: curl_info

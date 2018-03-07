@@ -1,0 +1,8 @@
+---
+- block:
+  - include: ceph_health.yml
+  - include: ../../log/tasks/logging.yml
+  - include: osd_stat.yml
+  - include: ../../log/tasks/logging.yml
+  when: inventory_hostname in groups.ceph_mon
+  delegate_to: localhost

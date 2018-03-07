@@ -1,0 +1,9 @@
+---
+- block:
+  - import_tasks: ceph_version.yml
+  - import_tasks: ceph_cluster.yml
+  - import_tasks: mon_map.yml
+  - import_tasks: osd_map.yml
+  run_once: true
+- import_tasks: mon_process.yml
+...

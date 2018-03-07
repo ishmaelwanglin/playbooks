@@ -1,0 +1,62 @@
+---
+- name: ssd noop
+  gather_facts: false
+  remote_user: root
+  hosts: ceph_osd
+  tasks:
+  - name: smartctl --scan
+    shell: smartctl --scan |grep megaraid
+    register: raid_out
+    ignore_errors: true
+    changed_when: false
+  - block:
+    - name: < get disk list >
+      shell: lsscsi|awk '{if($2=="disk"){print $6}}'|egrep -o "sd."
+      register: disk_out
+      changed_when: false
+    - name: < get rotation rate >
+      shell: smartctl -i /dev/{{ item }}|awk -F ":" '/Rotation/{print $2}'
+      with_items:
+          "{{ disk_out.stdout_lines }}"
+      register: rotation_out
+      changed_when: false
+    - name: < echo noop change file >
+      lineinfile:
+          path: /etc/rc.local
+          line: echo noop > /sys/block/{{ item[1] }}/queue/scheduler
+      with_nested:
+          - "{{ rotation_out.results }}"
+          - "{{ disk_out.stdout_lines }}"
+      when: item[0].stdout.find('rpm') == -1
+    - name: < echo noop to sys >
+      shell: >
+          echo "noop" > /sys/block/{{ item[1] }}/queue/scheduler
+      with_nested:
+          - "{{ rotation_out.results }}"
+          - "{{ disk_out.stdout_lines }}"
+      when: item[0].stdout.find('rpm') == -1
+      changed_when: false
+    when: raid_out.rc == 1
+  - block:
+    - name: raid_out.rc == 0
+      shell: lsscsi|awk -F":" '{print $3,$4}'|awk '{printf "megaraid,%s %s\n",$1,$NF}'
+      register: scsi_out
+      faild_when: scsi_out.rc == 1
+      changed_when: false
+#列出所有的磁盘信息 生成megaraid,0 /dev/sda形式的信息列表
+    - name: < get rotation rate >
+      shell: smartctl -i -d {{ item }} | awk -F ":" '/Rotation/{print {{ item }},$2}'
+      with_items: "{{ scsi_out.stdout_lines }}"
+      register: rotation_out
+    - name: < echo noop >
+      shell: echo "noop" > /sys/block/{{ item.split()[0] }}/queue/scheduler
+      with_items: "{{ rotation_out.stdout_lines }}"
+      when: item.split()[1].find('rpm') == -1
+      changed_when: false
+    - name: < echo noop to rc.local >
+      lineinfile:
+          dest: /etc/rc.local
+          line: echo noop > /sys/block/{{ item.split()[0] }}/queue/scheduler
+      with_items: "{{ rotation_out.stdout_lines }}"
+      when: item.split()[1].find('rpm') == -1
+    when: raid_out.rc == 0

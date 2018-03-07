@@ -1,0 +1,117 @@
+---
+# Name: RabbitMQ_Reboot
+# Description: Reboot rabbitmq-server with openstack cluster for CentOS 7 
+# Author: wanglin
+# Date: 2018.03.05
+# version: 1.1
+- name: RabbitMQ Server Reboot - Controller
+  hosts: controller
+  gather_facts: true
+  remote_user: root
+  vars_files:
+    - escloud_moncheck/roles/controller/vars/main.yml
+  tasks:
+  - name: < RabbitMQ_Reboot| kill service > 
+    shell: systemctl kill rabbitmq-server.service
+    ignore_errors: true
+    when: 
+      - ansible_lsb.id == "CentOS"
+      - ansible_lsb.major_release == "7"
+ 
+  - name: < RabbitMQ_Reboot| kill processes >
+    shell: ps -U rabbitmq -o pid --no-headers |xargs -i kill -9 {}
+    ignore_errors: true
+    when: 
+      - ansible_lsb.id == "CentOS"
+      - ansible_lsb.major_release == "6"
+
+  - name: < RabbitMQ_Reboot| restart service rabbitmq-server >
+    systemd:
+      name: rabbitmq-server.service
+      state: started
+
+  - name: < RabbitMQ_Reboot| get crm resource names >
+    shell: |-
+      crm resource list |egrep -v "^ +St" | \
+      awk '{gsub(/\[|\]/,"");if($0~"Clone"){print $NF}else{print $1}}'| \
+      egrep -v "(vip|haproxy|mysql|hagent|zabbix)"
+    register: crm_services
+    tags: 
+      - crm_reboot
+
+  - name: < RabbitMQ_Reboot| reboot crm resrource >
+    shell: crm resource restart {{ item }}
+    with_items: "{{ crm_services.stdout_lines }}"
+    run_once: true
+    tags: 
+      - crm_reboot
+#CentOS 7
+  - name: < RabbitMQ_Reboot| get openstack-service status >
+    shell: |-
+      which openstack-service >/dev/null
+      if [ $? -eq 0 ] ;then
+          set -- $(openstack-service status|tr "=" " "|awk '{print $4}')
+          for i in $@;do
+              service_name=$i
+              i=${i%%.service}
+              i=${i/openstack-/}
+              if [[ $i == keystone ]];then
+                  logfile=$(locate ${i}.log -l 1)
+              else
+                  index=$(expr index $i "-")
+                  logfile=$(locate -r ${i:0:$index-1}/.*${i:index}.log$ -l 1)
+              fi
+              tail -n 200 $logfile |grep -i reconnected &>/dev/null
+              if [ $? -eq 0 ];then
+                  echo $service_name
+              fi
+          done
+      fi
+    register: openstack_services_list
+    failed_when: openstack_services_list.rc != 0
+    ignore_errors: true
+  - name: < RabbitMQ_Reboot| set value new_services_list >
+    set_fact:
+      new_services_list: "{{ new_services_list|default([]) + [item]}}"
+    with_items: "{{ openstack_services_list.stdout_lines }}"
+    when: openstack_services_list.rc == 0
+# CentOS 6 
+  - name: < RabbitMQ_Reboot| set value new_service_list >
+    set_fact:
+      new_services_list: "{{ new_services_list|default([]) + [item]}}"
+    with_flattened:
+      - "{{ glance_services }}"
+      - "{{ nova_compute_services }}"
+      - "{{ neutron_server_services }}"
+      - "{{ cinder_services }}"
+      - "{{ heat_servives }}"
+      - "{{ trove_servies }}"
+      - "{{ ceilometer_services }}"
+      - "{{ keystone_services }}"
+      - "{{ magnum_services }}"
+      - "{{ common_services }}"
+    when: openstack_services_list.rc != 0
+
+  - name: < RabbitMQ_Reboot| reboot openstack service >
+    systemd:
+      name: "{{ item }}"
+      state: restarted
+    with_items: "{{ new_services_list }}"
+# compute nodes
+- name: RabbitMQ Server Reboot - Compute
+  gather_facts: false
+  remote_user: root
+  hosts: compute
+  tasks:
+  - name: < RabbitMQ_Reboot| get openstack service names >
+    shell: |-
+      systemctl list-unit-files --type=service|egrep "openstack|neutron" | \
+      awk '{if($2=="enabled")print $1}'
+    register: compute_services_list
+  - name: < RabbitMQ_Reboot| reboot openstack nova compute service >
+    systemd:
+      name: "{{ item }}"
+      state: restarted
+    with_items:
+      - "{{ compute_services_list.stdout_lines }}"
+...

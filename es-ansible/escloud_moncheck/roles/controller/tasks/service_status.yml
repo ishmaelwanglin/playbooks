@@ -1,0 +1,57 @@
+---
+- name: < get openstack-service status >
+  shell: |-
+    which openstack-service >/dev/null && openstack-service status|tr "=" " "|awk '{print $4}'
+  register: openstack_services_list
+  failed_when: openstack_services_list.rc != 0
+  ignore_errors: true
+  tags:
+    - oslist
+- name: < set_fact new_services_list >
+  set_fact: 
+    new_services_list: "{{ new_services_list|default([]) + [item]}}"
+  with_items: "{{ openstack_services_list.stdout_lines }}"
+  when: openstack_services_list.rc == 0
+  tags:
+    - newslist  
+- name: < set_fact service_list if openstack_services_list.rc != 0 >
+  set_fact: 
+    new_services_list: "{{ new_services_list|default([]) + [item]}}"
+  with_flattened:
+    - "{{ glance_services }}"
+    - "{{ nova_compute_services }}"
+    - "{{ neutron_server_services }}"
+    - "{{ cinder_services }}"
+    - "{{ heat_servives }}"
+    - "{{ trove_servies }}"
+    - "{{ ceilometer_services }}"
+    - "{{ keystone_services }}"
+    - "{{ magnum_services }}"
+    - "{{ common_services }}"
+  when: openstack_services_list.rc != 0
+  tags:
+    - newslist
+- name: < service process status >
+  shell: |-
+    arr=($(systemctl status {{ item }}| \
+    awk '/Active|Main PID/{gsub(/\(|\)/,"");if($0~"Active"){printf "%s ",$2}else if($0~PID){printf "%s\n",$4}}'))
+    echo "${arr[0]} $(pgrep -c ${arr[1]})"
+  with_items: "{{ new_services_list }}"
+  register: process_out
+  ignore_errors: true
+- block:
+  - name: < write log, success >
+    shell: echo "[INFO] on {{ hostname }} {{ item.item }} is active." >> {{ logfile }}
+    with_items: "{{ process_out.results }}"
+    when: 
+      - item.stdout.split()[0] == "active"
+      - item.stdout.split()[1]|int|default(0) > 0
+  - name: < write log, failed >
+    shell: echo "[WARN] on {{ hostname }} {{ item.stdout.split()[1] }} is inactive." >> {{ logfile }}
+    with_items: "{{ process_out.results }}"
+    when: 
+      - item.stdout.split()[0] != "active"
+      - item.stdout.split()[1]|int|default(0) > 0
+  delegate_to: localhost
+  ignore_errors: true
+  tags: block_log

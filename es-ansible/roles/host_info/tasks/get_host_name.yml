@@ -1,0 +1,8 @@
+---
+- name: < get physical node hostname >
+  shell: hostname -s
+  changed_when: false
+  register: hostname_out
+- name: < set_fact hostname >
+  set_fact: 
+      hostname: "{{ hostname_out.stdout }}"

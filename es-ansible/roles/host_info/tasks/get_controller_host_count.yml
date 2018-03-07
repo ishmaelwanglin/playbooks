@@ -1,0 +1,8 @@
+---
+- name: < get controller node count number >
+  shell: cat /etc/haproxy/conf.d/020-keystone-1.cfg |grep server | awk '{print $2}'| wc -l
+  args:
+      removes: /etc/haproxy/conf.d/020-keystone-1.cfg
+  register: controller_count_out
+- set_fact:
+      controller_count: controller_count_out.stdout|int

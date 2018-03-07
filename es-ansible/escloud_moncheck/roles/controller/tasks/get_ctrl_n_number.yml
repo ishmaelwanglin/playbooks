@@ -1,0 +1,7 @@
+---
+- name: < get controller nodes >
+  shell: cat /etc/haproxy/conf.d/020-keystone-1.cfg |grep server | awk '{print $2}'
+  register: ctrl_nodes_out
+- name: < get controller nodes number >
+  shell: echo {{ ctrl_nodes_out.stdout_lines }}|wc -w
+  register: ctrl_nodes_number_out
